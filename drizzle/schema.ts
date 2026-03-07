@@ -26,3 +26,43 @@ export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 
 // TODO: Add your tables here
+
+/**
+ * Tabla principal de procedimientos médicos.
+ * Almacena cirugías, procedimientos e interconsultas del traumatólogo.
+ */
+export const procedures = mysqlTable("procedures", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+
+  // Datos del paciente
+  patientName: varchar("patientName", { length: 255 }).notNull(),
+  patientRut: varchar("patientRut", { length: 20 }).notNull(),
+
+  // Datos del procedimiento
+  date: timestamp("date").notNull(),
+  prestacionNumber: varchar("prestacionNumber", { length: 100 }),
+  diagnosis: text("diagnosis"),
+  procedureName: text("procedureName"),
+  procedureCode: varchar("procedureCode", { length: 100 }),
+
+  // Clasificación
+  type: mysqlEnum("type", ["cirugia", "procedimiento", "interconsulta"]).notNull().default("cirugia"),
+  schedule: mysqlEnum("schedule", ["habil", "inhabil"]).notNull().default("habil"),
+
+  // Lugar
+  clinic: varchar("clinic", { length: 255 }).notNull(),
+
+  // Imagen del protocolo
+  photoUrl: text("photoUrl"),
+
+  // Notas adicionales
+  notes: text("notes"),
+
+  // Metadatos
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Procedure = typeof procedures.$inferSelect;
+export type InsertProcedure = typeof procedures.$inferInsert;

@@ -1,6 +1,6 @@
-import { eq } from "drizzle-orm";
+import { and, desc, eq, gte, lte } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users } from "../drizzle/schema";
+import { InsertUser, users, procedures, InsertProcedure, Procedure } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -89,4 +89,116 @@ export async function getUserByOpenId(openId: string) {
   return result.length > 0 ? result[0] : undefined;
 }
 
-// TODO: add feature queries here as your schema grows.
+// ============================================================
+// PROCEDURES CRUD
+// ============================================================
+
+export async function getUserProcedures(
+  userId: number,
+  filters?: {
+    startDate?: Date;
+    endDate?: Date;
+    type?: "cirugia" | "procedimiento" | "interconsulta";
+    clinic?: string;
+  }
+): Promise<Procedure[]> {
+  const db = await getDb();
+  if (!db) return [];
+
+  const conditions = [eq(procedures.userId, userId)];
+
+  if (filters?.startDate) {
+    conditions.push(gte(procedures.date, filters.startDate));
+  }
+  if (filters?.endDate) {
+    conditions.push(lte(procedures.date, filters.endDate));
+  }
+  if (filters?.type) {
+    conditions.push(eq(procedures.type, filters.type));
+  }
+  if (filters?.clinic) {
+    conditions.push(eq(procedures.clinic, filters.clinic));
+  }
+
+  return db
+    .select()
+    .from(procedures)
+    .where(and(...conditions))
+    .orderBy(desc(procedures.date));
+}
+
+export async function getProcedureById(id: number, userId: number): Promise<Procedure | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+
+  const result = await db
+    .select()
+    .from(procedures)
+    .where(and(eq(procedures.id, id), eq(procedures.userId, userId)))
+    .limit(1);
+
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function createProcedure(data: InsertProcedure): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const result = await db.insert(procedures).values(data);
+  return (result as any)[0]?.insertId ?? 0;
+}
+
+export async function updateProcedure(
+  id: number,
+  userId: number,
+  data: Partial<InsertProcedure>
+): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db
+    .update(procedures)
+    .set({ ...data, updatedAt: new Date() })
+    .where(and(eq(procedures.id, id), eq(procedures.userId, userId)));
+}
+
+export async function deleteProcedure(id: number, userId: number): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db
+    .delete(procedures)
+    .where(and(eq(procedures.id, id), eq(procedures.userId, userId)));
+}
+
+export async function getProceduresByPeriod(
+  userId: number,
+  year: number,
+  month?: number
+): Promise<Procedure[]> {
+  const db = await getDb();
+  if (!db) return [];
+
+  let startDate: Date;
+  let endDate: Date;
+
+  if (month !== undefined) {
+    startDate = new Date(year, month - 1, 1);
+    endDate = new Date(year, month, 0, 23, 59, 59);
+  } else {
+    startDate = new Date(year, 0, 1);
+    endDate = new Date(year, 11, 31, 23, 59, 59);
+  }
+
+  return db
+    .select()
+    .from(procedures)
+    .where(
+      and(
+        eq(procedures.userId, userId),
+        gte(procedures.date, startDate),
+        lte(procedures.date, endDate)
+      )
+    )
+    .orderBy(desc(procedures.date));
+}
