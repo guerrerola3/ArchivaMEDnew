@@ -64,3 +64,4 @@
 ## Bugs
 - [x] OCR no funciona: el reconocimiento de texto desde fotos no extrae datos correctamente
 - [x] Error "No se pudo leer la imagen" al intentar OCR - FileSystem.readAsStringAsync falla con URIs de cámara/galería
+- [x] Botones de exportación PDF y Excel no hacen nada al presionarlos

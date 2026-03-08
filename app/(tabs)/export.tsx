@@ -24,6 +24,12 @@ import {
 } from "@/lib/procedures-context";
 import { utils, write } from "xlsx";
 
+// Helper: show error as Alert AND log to console
+function showError(title: string, message: string, err?: unknown) {
+  console.error(`[Export] ${title}:`, err ?? message);
+  Alert.alert(title, message, [{ text: "OK" }]);
+}
+
 type ExportPeriod = "current_month" | "last_3_months" | "current_year" | "all" | "custom";
 
 interface PeriodOption {
@@ -241,26 +247,23 @@ export default function ExportScreen() {
 
   const handleExportExcel = async () => {
     if (filteredProcedures.length === 0) {
-      Alert.alert("Sin datos", "No hay procedimientos en el período seleccionado");
+      Alert.alert("Sin datos", "No hay procedimientos en el período seleccionado. Seleccione un período diferente o agregue procedimientos primero.");
       return;
     }
 
     setIsExporting("excel");
     try {
+      // Build workbook
       const data = buildExcelData(filteredProcedures);
       const ws = utils.aoa_to_sheet(data);
-
-      // Column widths
       ws["!cols"] = [
         { wch: 12 }, { wch: 8 }, { wch: 28 }, { wch: 14 }, { wch: 14 },
         { wch: 30 }, { wch: 30 }, { wch: 12 }, { wch: 16 }, { wch: 10 },
         { wch: 22 }, { wch: 30 },
       ];
-
       const wb = utils.book_new();
       utils.book_append_sheet(wb, ws, "Procedimientos");
 
-      // Summary sheet
       const summaryData = [
         ["RESUMEN - " + periodLabel],
         [""],
@@ -276,26 +279,37 @@ export default function ExportScreen() {
       wsSummary["!cols"] = [{ wch: 25 }, { wch: 10 }];
       utils.book_append_sheet(wb, wsSummary, "Resumen");
 
-      const xlsxData = write(wb, { type: "base64", bookType: "xlsx" });
-      const fileName = `TraumaLog_${periodLabel.replace(/\s+/g, "_")}_${Date.now()}.xlsx`;
+      // Write to base64 and save to documentDirectory
+      const xlsxBase64 = write(wb, { type: "base64", bookType: "xlsx" });
+      const safeLabel = periodLabel.replace(/[^a-zA-Z0-9_\-]/g, "_");
+      const fileName = `TraumaLog_${safeLabel}_${Date.now()}.xlsx`;
       const fileUri = `${FileSystem.documentDirectory}${fileName}`;
 
-      await FileSystem.writeAsStringAsync(fileUri, xlsxData, {
+      await FileSystem.writeAsStringAsync(fileUri, xlsxBase64, {
         encoding: FileSystem.EncodingType.Base64,
       });
 
-      if (await Sharing.isAvailableAsync()) {
+      // Share the file — shareAsync works directly with the file URI on iOS/Android
+      const sharingAvailable = await Sharing.isAvailableAsync();
+      if (sharingAvailable) {
         await Sharing.shareAsync(fileUri, {
           mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
           dialogTitle: "Exportar a Excel",
           UTI: "com.microsoft.excel.xlsx",
         });
       } else {
-        Alert.alert("Éxito", `Archivo guardado en: ${fileUri}`);
+        Alert.alert(
+          "Archivo generado",
+          `El archivo Excel fue guardado en el almacenamiento de la app.\n\nRuta: ${fileUri}`,
+          [{ text: "OK" }]
+        );
       }
-    } catch (e) {
-      console.error("Excel export error:", e);
-      Alert.alert("Error", "No se pudo generar el archivo Excel");
+    } catch (e: unknown) {
+      showError(
+        "Error al exportar Excel",
+        "No se pudo generar el archivo. Verifique que tenga espacio disponible e intente nuevamente.",
+        e
+      );
     } finally {
       setIsExporting(null);
     }
@@ -303,31 +317,42 @@ export default function ExportScreen() {
 
   const handleExportPdf = async () => {
     if (filteredProcedures.length === 0) {
-      Alert.alert("Sin datos", "No hay procedimientos en el período seleccionado");
+      Alert.alert("Sin datos", "No hay procedimientos en el período seleccionado. Seleccione un período diferente o agregue procedimientos primero.");
       return;
     }
 
     setIsExporting("pdf");
     try {
       const html = buildPdfHtml(filteredProcedures, periodLabel);
-      const { uri } = await Print.printToFileAsync({ html, base64: false });
 
-      const fileName = `TraumaLog_${periodLabel.replace(/\s+/g, "_")}_${Date.now()}.pdf`;
-      const destUri = `${FileSystem.documentDirectory}${fileName}`;
-      await FileSystem.moveAsync({ from: uri, to: destUri });
+      // printToFileAsync saves to cache dir — share directly from that URI
+      const { uri } = await Print.printToFileAsync({ html });
 
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(destUri, {
+      const sharingAvailable = await Sharing.isAvailableAsync();
+      if (sharingAvailable) {
+        // Share directly from the cache URI — no need to move the file
+        await Sharing.shareAsync(uri, {
           mimeType: "application/pdf",
-          dialogTitle: "Exportar a PDF",
+          dialogTitle: "Exportar reporte PDF",
           UTI: "com.adobe.pdf",
         });
       } else {
-        Alert.alert("Éxito", `PDF guardado en: ${destUri}`);
+        // Fallback: move to documentDirectory and inform user
+        const safeLabel = periodLabel.replace(/[^a-zA-Z0-9_\-]/g, "_");
+        const destUri = `${FileSystem.documentDirectory}TraumaLog_${safeLabel}_${Date.now()}.pdf`;
+        await FileSystem.moveAsync({ from: uri, to: destUri });
+        Alert.alert(
+          "PDF generado",
+          `El reporte PDF fue guardado en el almacenamiento de la app.\n\nRuta: ${destUri}`,
+          [{ text: "OK" }]
+        );
       }
-    } catch (e) {
-      console.error("PDF export error:", e);
-      Alert.alert("Error", "No se pudo generar el PDF");
+    } catch (e: unknown) {
+      showError(
+        "Error al exportar PDF",
+        "No se pudo generar el reporte PDF. Intente nuevamente.",
+        e
+      );
     } finally {
       setIsExporting(null);
     }
@@ -335,16 +360,19 @@ export default function ExportScreen() {
 
   const handlePrint = async () => {
     if (filteredProcedures.length === 0) {
-      Alert.alert("Sin datos", "No hay procedimientos en el período seleccionado");
+      Alert.alert("Sin datos", "No hay procedimientos en el período seleccionado. Seleccione un período diferente o agregue procedimientos primero.");
       return;
     }
 
     try {
       const html = buildPdfHtml(filteredProcedures, periodLabel);
-      await Print.printAsync({ html });
-    } catch (e) {
-      console.error("Print error:", e);
-      Alert.alert("Error", "No se pudo imprimir");
+      if (Platform.OS === "web") {
+        await Print.printAsync({});
+      } else {
+        await Print.printAsync({ html });
+      }
+    } catch (e: unknown) {
+      showError("Error al imprimir", "No se pudo abrir el diálogo de impresión. Intente nuevamente.", e);
     }
   };
 
