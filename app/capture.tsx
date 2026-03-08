@@ -1,5 +1,4 @@
 import { CameraView, useCameraPermissions } from "expo-camera";
-import * as FileSystem from "expo-file-system/legacy";
 import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
 import { useRef, useState } from "react";
@@ -7,7 +6,6 @@ import {
   ActivityIndicator,
   Alert,
   Image,
-  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -35,38 +33,16 @@ interface ExtractedData {
   notes?: string | null;
 }
 
-/**
- * Reads a file URI and returns its base64 content.
- * Handles both ph:// (iOS Photos) and file:// URIs.
- */
-async function readImageAsBase64(uri: string): Promise<string> {
-  // On iOS, ph:// URIs from the media library cannot be read directly.
-  // We must copy them to a temp location first.
-  if (Platform.OS === "ios" && uri.startsWith("ph://")) {
-    const tempUri = FileSystem.cacheDirectory + `ocr_temp_${Date.now()}.jpg`;
-    await FileSystem.copyAsync({ from: uri, to: tempUri });
-    const base64 = await FileSystem.readAsStringAsync(tempUri, {
-      encoding: FileSystem.EncodingType.Base64,
-    });
-    // Clean up temp file (fire and forget)
-    FileSystem.deleteAsync(tempUri, { idempotent: true }).catch(() => {});
-    return base64;
-  }
-
-  // For file:// URIs (camera captures and most gallery picks)
-  const base64 = await FileSystem.readAsStringAsync(uri, {
-    encoding: FileSystem.EncodingType.Base64,
-  });
-  return base64;
-}
-
 export default function CaptureScreen() {
   const router = useRouter();
   const colors = useColors();
   const [permission, requestPermission] = useCameraPermissions();
   const cameraRef = useRef<CameraView>(null);
+
   const [step, setStep] = useState<CaptureStep>("camera");
   const [capturedUri, setCapturedUri] = useState<string | null>(null);
+  // base64 captured directly from camera/picker — no FileSystem needed
+  const [capturedBase64, setCapturedBase64] = useState<string | null>(null);
   const [extractedData, setExtractedData] = useState<ExtractedData | null>(null);
   const [uploadedPhotoUrl, setUploadedPhotoUrl] = useState<string | null>(null);
   const [processingError, setProcessingError] = useState<string | null>(null);
@@ -74,65 +50,65 @@ export default function CaptureScreen() {
 
   const extractMutation = trpc.procedures.extractFromPhoto.useMutation();
 
+  // ─── Take photo with camera (base64 included directly) ─────────────────────
   const handleTakePhoto = async () => {
     if (!cameraRef.current) return;
     try {
       const photo = await cameraRef.current.takePictureAsync({
-        quality: 0.85,
-        base64: false, // We'll read base64 via FileSystem for reliability
+        quality: 0.8,
+        base64: true, // Get base64 directly — no FileSystem read needed
         exif: false,
+        skipProcessing: false,
       });
       if (photo?.uri) {
         setCapturedUri(photo.uri);
+        setCapturedBase64(photo.base64 ?? null);
         setStep("preview");
       }
     } catch (e) {
+      console.error("takePictureAsync error:", e);
       Alert.alert("Error", "No se pudo tomar la foto. Intente nuevamente.");
     }
   };
 
+  // ─── Pick from gallery (base64 included directly) ──────────────────────────
   const handlePickFromGallery = async () => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        quality: 0.85,
-        base64: false, // We'll read base64 via FileSystem
+        quality: 0.8,
+        base64: true, // Get base64 directly — no FileSystem read needed
         allowsEditing: false,
       });
 
       if (!result.canceled && result.assets[0]) {
         const asset = result.assets[0];
         setCapturedUri(asset.uri);
+        setCapturedBase64(asset.base64 ?? null);
         setStep("preview");
       }
     } catch (e) {
+      console.error("launchImageLibraryAsync error:", e);
       Alert.alert("Error", "No se pudo acceder a la galería.");
     }
   };
 
+  // ─── Process OCR ────────────────────────────────────────────────────────────
   const handleProcessOCR = async () => {
-    if (!capturedUri) return;
+    if (!capturedBase64) {
+      Alert.alert(
+        "Sin imagen",
+        "No se encontró el dato de la imagen. Por favor tome o seleccione una foto nuevamente.",
+      );
+      return;
+    }
 
     setStep("processing");
     setProcessingError(null);
 
     try {
-      // Step 1: Read image as base64 using FileSystem (handles ph:// on iOS)
-      let base64: string;
-      try {
-        base64 = await readImageAsBase64(capturedUri);
-      } catch (readErr) {
-        console.error("Failed to read image as base64:", readErr);
-        throw new Error("No se pudo leer la imagen. Intente con otra foto.");
-      }
-
-      if (!base64 || base64.length < 100) {
-        throw new Error("La imagen está vacía o es inválida.");
-      }
-
-      // Step 2: Send to server for OCR processing
       const result = await extractMutation.mutateAsync({
-        imageBase64: base64,
+        imageBase64: capturedBase64,
         mimeType: "image/jpeg",
       });
 
@@ -140,16 +116,17 @@ export default function CaptureScreen() {
       setExtractedData(result.extractedData as ExtractedData);
       setStep("results");
     } catch (e: any) {
-      console.error("OCR processing error:", e);
-      const errorMsg =
-        e?.message?.includes("No se pudo")
-          ? e.message
+      console.error("OCR mutation error:", e);
+      const msg =
+        e?.message?.includes("LLM") || e?.message?.includes("Storage")
+          ? "Error al procesar la imagen en el servidor. Verifique su conexión e intente nuevamente."
           : "No se pudieron extraer los datos automáticamente. Puede ingresar los datos manualmente.";
-      setProcessingError(errorMsg);
+      setProcessingError(msg);
       setStep("preview");
     }
   };
 
+  // ─── Navigate to form with extracted data ──────────────────────────────────
   const handleConfirmAndNavigate = () => {
     const data = extractedData ?? {};
     (router as any).push({
@@ -182,13 +159,14 @@ export default function CaptureScreen() {
 
   const handleRetake = () => {
     setCapturedUri(null);
+    setCapturedBase64(null);
     setExtractedData(null);
     setUploadedPhotoUrl(null);
     setProcessingError(null);
     setStep("camera");
   };
 
-  // ─── Permission handling ───────────────────────────────────────────────────
+  // ─── Permission screen ──────────────────────────────────────────────────────
   if (!permission) {
     return (
       <ScreenContainer>
@@ -237,7 +215,7 @@ export default function CaptureScreen() {
     );
   }
 
-  // ─── Processing step ───────────────────────────────────────────────────────
+  // ─── Processing screen ──────────────────────────────────────────────────────
   if (step === "processing") {
     return (
       <ScreenContainer containerClassName="bg-background">
@@ -273,12 +251,17 @@ export default function CaptureScreen() {
     );
   }
 
-  // ─── Results step ──────────────────────────────────────────────────────────
+  // ─── Results screen ─────────────────────────────────────────────────────────
   if (step === "results" && extractedData) {
     const fields: { label: string; value: string | null | undefined }[] = [
       { label: "Nombre del Paciente", value: extractedData.patientName },
       { label: "RUT", value: extractedData.patientRut },
-      { label: "Fecha", value: extractedData.date ? new Date(extractedData.date).toLocaleDateString("es-CL") : null },
+      {
+        label: "Fecha",
+        value: extractedData.date
+          ? new Date(extractedData.date).toLocaleDateString("es-CL")
+          : null,
+      },
       { label: "N° Prestación", value: extractedData.prestacionNumber },
       { label: "Diagnóstico", value: extractedData.diagnosis },
       { label: "Procedimiento", value: extractedData.procedureName },
@@ -301,15 +284,19 @@ export default function CaptureScreen() {
         </View>
 
         <ScrollView contentContainerStyle={styles.resultsContent}>
-          {/* Success banner */}
-          <View style={[styles.successBanner, { backgroundColor: colors.success + "15", borderColor: colors.success + "40" }]}>
+          <View
+            style={[
+              styles.successBanner,
+              { backgroundColor: colors.success + "15", borderColor: colors.success + "40" },
+            ]}
+          >
             <IconSymbol name="checkmark.circle.fill" size={20} color={colors.success} />
             <Text style={[styles.successText, { color: colors.success }]}>
-              {detectedCount} campo{detectedCount !== 1 ? "s" : ""} detectado{detectedCount !== 1 ? "s" : ""} automáticamente
+              {detectedCount} campo{detectedCount !== 1 ? "s" : ""} detectado
+              {detectedCount !== 1 ? "s" : ""} automáticamente
             </Text>
           </View>
 
-          {/* Preview image */}
           {capturedUri && (
             <Image
               source={{ uri: capturedUri }}
@@ -318,8 +305,12 @@ export default function CaptureScreen() {
             />
           )}
 
-          {/* Extracted fields */}
-          <View style={[styles.fieldsCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <View
+            style={[
+              styles.fieldsCard,
+              { backgroundColor: colors.surface, borderColor: colors.border },
+            ]}
+          >
             <Text style={[styles.fieldsTitle, { color: colors.foreground }]}>
               Revise los datos extraídos
             </Text>
@@ -349,7 +340,6 @@ export default function CaptureScreen() {
             ))}
           </View>
 
-          {/* Actions */}
           <TouchableOpacity
             onPress={handleConfirmAndNavigate}
             style={[styles.actionButton, { backgroundColor: colors.primary }]}
@@ -371,7 +361,7 @@ export default function CaptureScreen() {
     );
   }
 
-  // ─── Preview step ──────────────────────────────────────────────────────────
+  // ─── Preview screen ─────────────────────────────────────────────────────────
   if (step === "preview" && capturedUri) {
     return (
       <ScreenContainer containerClassName="bg-background">
@@ -399,8 +389,28 @@ export default function CaptureScreen() {
                   { backgroundColor: colors.error + "15", borderColor: colors.error + "40" },
                 ]}
               >
-                <IconSymbol name="exclamationmark.triangle.fill" size={16} color={colors.error} />
-                <Text style={[styles.errorText, { color: colors.error }]}>{processingError}</Text>
+                <IconSymbol
+                  name="exclamationmark.triangle.fill"
+                  size={16}
+                  color={colors.error}
+                />
+                <Text style={[styles.errorText, { color: colors.error }]}>
+                  {processingError}
+                </Text>
+              </View>
+            )}
+
+            {!capturedBase64 && (
+              <View
+                style={[
+                  styles.errorBanner,
+                  { backgroundColor: colors.warning + "15", borderColor: colors.warning + "40" },
+                ]}
+              >
+                <IconSymbol name="exclamationmark.triangle.fill" size={16} color={colors.warning} />
+                <Text style={[styles.errorText, { color: colors.warning }]}>
+                  No se obtuvo el dato de imagen. Tome otra foto para usar el OCR.
+                </Text>
               </View>
             )}
 
@@ -410,7 +420,14 @@ export default function CaptureScreen() {
 
             <TouchableOpacity
               onPress={handleProcessOCR}
-              style={[styles.actionButton, { backgroundColor: colors.primary }]}
+              style={[
+                styles.actionButton,
+                {
+                  backgroundColor: capturedBase64 ? colors.primary : colors.muted,
+                  opacity: capturedBase64 ? 1 : 0.5,
+                },
+              ]}
+              disabled={!capturedBase64}
             >
               <IconSymbol name="waveform.path.ecg" size={20} color="white" />
               <Text style={styles.actionButtonText}>Extraer datos con IA</Text>
@@ -437,11 +454,11 @@ export default function CaptureScreen() {
     );
   }
 
-  // ─── Camera step ───────────────────────────────────────────────────────────
+  // ─── Camera screen ──────────────────────────────────────────────────────────
   return (
     <View style={styles.cameraContainer}>
       <CameraView ref={cameraRef} style={styles.camera} facing={facing}>
-        {/* Header overlay */}
+        {/* Header */}
         <View style={styles.cameraHeader}>
           <TouchableOpacity onPress={() => router.back()} style={styles.cameraHeaderButton}>
             <IconSymbol name="xmark" size={22} color="white" />
@@ -455,7 +472,7 @@ export default function CaptureScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Guide overlay */}
+        {/* Guide frame */}
         <View style={styles.cameraGuide}>
           <View style={styles.guideFrame}>
             <View style={[styles.guideCorner, styles.guideCornerTL]} />
@@ -468,7 +485,7 @@ export default function CaptureScreen() {
           </Text>
         </View>
 
-        {/* Bottom controls */}
+        {/* Controls */}
         <View style={styles.cameraControls}>
           <TouchableOpacity onPress={handlePickFromGallery} style={styles.galleryButton}>
             <IconSymbol name="photo.fill" size={26} color="white" />
@@ -488,6 +505,7 @@ export default function CaptureScreen() {
 
 const styles = StyleSheet.create({
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
+
   header: {
     paddingHorizontal: 16,
     paddingVertical: 14,
@@ -498,7 +516,6 @@ const styles = StyleSheet.create({
   headerTitle: { fontSize: 17, fontWeight: "600", color: "white" },
   backButton: { padding: 4 },
 
-  // Permission screen
   permissionContainer: {
     flex: 1,
     justifyContent: "center",
@@ -509,7 +526,6 @@ const styles = StyleSheet.create({
   permissionTitle: { fontSize: 20, fontWeight: "700", textAlign: "center" },
   permissionText: { fontSize: 14, textAlign: "center", lineHeight: 20 },
 
-  // Buttons
   actionButton: {
     flexDirection: "row",
     alignItems: "center",
@@ -532,7 +548,6 @@ const styles = StyleSheet.create({
   },
   outlineButtonText: { fontWeight: "600", fontSize: 14 },
 
-  // Processing
   processingContainer: { flex: 1, position: "relative" },
   processingImage: { flex: 1, opacity: 0.35 },
   processingOverlay: {
@@ -555,7 +570,6 @@ const styles = StyleSheet.create({
   processingTitle: { fontSize: 18, fontWeight: "700" },
   processingText: { fontSize: 13, textAlign: "center", lineHeight: 18 },
 
-  // Preview
   previewContainer: { flex: 1 },
   previewImage: { flex: 1 },
   previewActions: {
@@ -567,7 +581,6 @@ const styles = StyleSheet.create({
   retakeButton: { alignItems: "center", paddingVertical: 8 },
   retakeButtonText: { fontSize: 14 },
 
-  // Error / Success banners
   errorBanner: {
     flexDirection: "row",
     alignItems: "flex-start",
@@ -588,7 +601,6 @@ const styles = StyleSheet.create({
   },
   successText: { fontSize: 14, fontWeight: "600" },
 
-  // Results
   resultsContent: { padding: 16, gap: 14, paddingBottom: 40 },
   resultImage: {
     width: "100%",
@@ -600,7 +612,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     padding: 16,
-    gap: 0,
   },
   fieldsTitle: { fontSize: 15, fontWeight: "600", marginBottom: 4 },
   fieldsSubtitle: { fontSize: 12, marginBottom: 12, lineHeight: 16 },
@@ -615,7 +626,6 @@ const styles = StyleSheet.create({
   fieldLabel: { fontSize: 12, flex: 1, lineHeight: 16 },
   fieldValue: { fontSize: 13, fontWeight: "500", flex: 2, textAlign: "right", lineHeight: 18 },
 
-  // Camera
   cameraContainer: { flex: 1, backgroundColor: "#000" },
   camera: { flex: 1 },
   cameraHeader: {
