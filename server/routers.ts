@@ -98,14 +98,16 @@ export const appRouter = router({
         return db.deleteProcedure(input.id, ctx.user.id);
       }),
 
-    extractFromPhoto: protectedProcedure
+    extractFromPhoto: publicProcedure
       .input(z.object({
         imageBase64: z.string(),
         mimeType: z.string().default("image/jpeg"),
       }))
       .mutation(async ({ ctx, input }) => {
+        // Upload image to storage (use user id if authenticated, else anonymous)
+        const userId = ctx.user?.id ?? "anon";
         const imageBuffer = Buffer.from(input.imageBase64, "base64");
-        const fileName = `procedures/${ctx.user.id}/${Date.now()}.jpg`;
+        const fileName = `procedures/${userId}/${Date.now()}.jpg`;
         const { url: photoUrl } = await storagePut(fileName, imageBuffer, input.mimeType);
 
         const systemMessage = `Eres un asistente médico especializado en extraer datos de protocolos operatorios y fichas clínicas chilenas.

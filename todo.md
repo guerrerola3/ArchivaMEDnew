@@ -60,3 +60,6 @@
 - [x] Almacenamiento local con AsyncStorage como fallback
 - [x] Sincronización con base de datos en nube
 - [x] Manejo de estado offline
+
+## Bugs
+- [x] OCR no funciona: el reconocimiento de texto desde fotos no extrae datos correctamente

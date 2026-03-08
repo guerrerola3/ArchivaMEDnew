@@ -87,6 +87,21 @@ const config: ExpoConfig = {
   plugins: [
     "expo-router",
     [
+      "expo-camera",
+      {
+        cameraPermission: "Permitir que TraumaLog acceda a la cámara para fotografiar protocolos operatorios.",
+        microphonePermission: "Permitir que TraumaLog acceda al micrófono.",
+        recordAudioAndroid: false,
+      },
+    ],
+    [
+      "expo-image-picker",
+      {
+        photosPermission: "Permitir que TraumaLog acceda a tus fotos para importar protocolos operatorios.",
+        cameraPermission: "Permitir que TraumaLog acceda a la cámara para fotografiar protocolos operatorios.",
+      },
+    ],
+    [
       "expo-audio",
       {
         microphonePermission: "Allow $(PRODUCT_NAME) to access your microphone.",
