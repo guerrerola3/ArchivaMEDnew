@@ -111,11 +111,19 @@ export const appRouter = router({
         const { url: photoUrl } = await storagePut(fileName, imageBuffer, input.mimeType);
 
         const systemMessage = `Eres un asistente médico especializado en extraer datos de protocolos operatorios y fichas clínicas chilenas.
+
+INSTRUCCIONES CRÍTICAS:
+1. NOMBRES Y APELLIDOS: En protocolos chilenos, el nombre suele estar en formato "Apellido, Nombre" o "Apellido Apellido, Nombre". IMPORTANTE: Extrae el nombre en orden natural: "Nombre Apellido(s)" (NO invertido). Si ves "García, Juan", devuelve "Juan García".
+2. NÚMERO DE PRESTACIÓN: Busca campos etiquetados como "Número de Prestación", "Número de Episodio", "Episodio", "Admisión", "N° Admisión", "N° Episodio" o "ID Prestación". Todos estos son equivalentes al campo prestacionNumber.
+3. FECHA: Busca en formato DD/MM/YYYY, DD-MM-YYYY o similar. Convierte a ISO 8601 (YYYY-MM-DDTHH:mm:ss.000Z). Si solo hay fecha sin hora, usa 00:00:00.
+4. TIPO: Identifica si es una cirugía, procedimiento diagnóstico/terapéutico, o interconsulta.
+5. HORARIO: Determina si fue en horario hábil (lunes-viernes 8:00-17:00) o inhábil basándote en la fecha/hora si está disponible.
+
 Analiza la imagen y extrae los siguientes datos en formato JSON:
-- patientName: Nombre completo del paciente
+- patientName: Nombre completo del paciente (en orden natural: Nombre Apellido, NO invertido)
 - patientRut: RUT del paciente (formato XX.XXX.XXX-X)
 - date: Fecha del procedimiento (formato ISO 8601: YYYY-MM-DDTHH:mm:ss.000Z)
-- prestacionNumber: Número de prestación o ID del procedimiento
+- prestacionNumber: Número de prestación/episodio/admisión (busca en etiquetas alternativas como "N° Episodio", "Admisión", etc.)
 - diagnosis: Diagnóstico principal
 - procedureName: Nombre del procedimiento realizado
 - procedureCode: Código del procedimiento o cirugía
@@ -125,7 +133,7 @@ Analiza la imagen y extrae los siguientes datos en formato JSON:
 - notes: Observaciones adicionales
 
 Si no puedes leer algún campo, déjalo como null.
-Responde SOLO con el JSON, sin texto adicional.`;
+Responde SOLO con el JSON válido, sin texto adicional.`;
 
         const llmResult = await invokeLLM({
           messages: [
@@ -133,7 +141,7 @@ Responde SOLO con el JSON, sin texto adicional.`;
             {
               role: "user",
               content: [
-                { type: "text", text: "Extrae los datos de este protocolo operatorio:" },
+                { type: "text", text: "Extrae TODOS los datos de este protocolo operatorio o ficha clínica chilena. IMPORTANTE: (1) El nombre del paciente debe estar en orden natural (Nombre Apellido), NO invertido. (2) Busca cualquier campo que diga 'Número de Episodio', 'Admisión', 'N° Episodio' o similar - son equivalentes a 'Número de Prestación'. Responde SOLO con JSON válido." },
                 { type: "image_url", image_url: { url: `data:${input.mimeType};base64,${input.imageBase64}`, detail: "high" } },
               ],
             },
