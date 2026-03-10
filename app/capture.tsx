@@ -1,4 +1,5 @@
 import { CameraView, useCameraPermissions } from "expo-camera";
+import * as ImageManipulator from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
 import { useRef, useState } from "react";
@@ -41,14 +42,46 @@ export default function CaptureScreen() {
 
   const [step, setStep] = useState<CaptureStep>("camera");
   const [capturedUri, setCapturedUri] = useState<string | null>(null);
-  // base64 captured directly from camera/picker — no FileSystem needed
   const [capturedBase64, setCapturedBase64] = useState<string | null>(null);
   const [extractedData, setExtractedData] = useState<ExtractedData | null>(null);
   const [uploadedPhotoUrl, setUploadedPhotoUrl] = useState<string | null>(null);
   const [processingError, setProcessingError] = useState<string | null>(null);
   const [facing, setFacing] = useState<"back" | "front">("back");
+  const [compressionStats, setCompressionStats] = useState<{
+    original: number;
+    compressed: number;
+  } | null>(null);
 
   const extractMutation = trpc.procedures.extractFromPhoto.useMutation();
+
+  // ─── Compress image for faster OCR ─────────────────────────────────────────
+  const compressImage = async (base64: string): Promise<string> => {
+    try {
+      // Create a temporary URI from base64
+      const tempUri = `data:image/jpeg;base64,${base64}`;
+
+      // Use ImageManipulator to resize and compress
+      const result = await ImageManipulator.manipulateAsync(tempUri, [
+        { resize: { width: 1200, height: 1600 } }, // Reduce to max 1200x1600
+      ]);
+
+      if (result.base64) {
+        // Calculate size reduction
+        const originalSize = base64.length;
+        const compressedSize = result.base64.length;
+        setCompressionStats({ original: originalSize, compressed: compressedSize });
+        const reduction = ((1 - compressedSize / originalSize) * 100).toFixed(0);
+        console.log(
+          `[OCR Compression] Original: ${(originalSize / 1024).toFixed(1)}KB → Compressed: ${(compressedSize / 1024).toFixed(1)}KB (${reduction}% reduction)`
+        );
+        return result.base64;
+      }
+      return base64; // Fallback to original if compression fails
+    } catch (e) {
+      console.warn("[OCR Compression] Failed to compress image, using original:", e);
+      return base64; // Fallback to original on error
+    }
+  };
 
   // ─── Take photo with camera (base64 included directly) ─────────────────────
   const handleTakePhoto = async () => {
@@ -56,7 +89,7 @@ export default function CaptureScreen() {
     try {
       const photo = await cameraRef.current.takePictureAsync({
         quality: 0.8,
-        base64: true, // Get base64 directly — no FileSystem read needed
+        base64: true,
         exif: false,
         skipProcessing: false,
       });
@@ -77,7 +110,7 @@ export default function CaptureScreen() {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         quality: 0.8,
-        base64: true, // Get base64 directly — no FileSystem read needed
+        base64: true,
         allowsEditing: false,
       });
 
@@ -98,7 +131,7 @@ export default function CaptureScreen() {
     if (!capturedBase64) {
       Alert.alert(
         "Sin imagen",
-        "No se encontró el dato de la imagen. Por favor tome o seleccione una foto nuevamente.",
+        "No se encontró el dato de la imagen. Por favor tome o seleccione una foto nuevamente."
       );
       return;
     }
@@ -107,8 +140,13 @@ export default function CaptureScreen() {
     setProcessingError(null);
 
     try {
+      // Compress image before sending to OCR for faster processing
+      console.log("[OCR] Starting image compression...");
+      const compressedBase64 = await compressImage(capturedBase64);
+
+      console.log("[OCR] Sending compressed image to LLM...");
       const result = await extractMutation.mutateAsync({
-        imageBase64: capturedBase64,
+        imageBase64: compressedBase64,
         mimeType: "image/jpeg",
       });
 
@@ -150,558 +188,390 @@ export default function CaptureScreen() {
     });
   };
 
-  const handleManualEntry = () => {
-    (router as any).push({
-      pathname: "/procedure/new",
-      params: { photoUrl: capturedUri ?? "" },
-    });
-  };
+  // ─── Render ─────────────────────────────────────────────────────────────────
 
-  const handleRetake = () => {
-    setCapturedUri(null);
-    setCapturedBase64(null);
-    setExtractedData(null);
-    setUploadedPhotoUrl(null);
-    setProcessingError(null);
-    setStep("camera");
-  };
+  if (step === "camera") {
+    if (!permission) {
+      return (
+        <ScreenContainer className="justify-center items-center">
+          <Text style={{ color: colors.foreground }}>Solicitando permisos de cámara...</Text>
+        </ScreenContainer>
+      );
+    }
 
-  // ─── Permission screen ──────────────────────────────────────────────────────
-  if (!permission) {
-    return (
-      <ScreenContainer>
-        <View style={styles.center}>
-          <ActivityIndicator color={colors.primary} />
-        </View>
-      </ScreenContainer>
-    );
-  }
-
-  if (!permission.granted) {
-    return (
-      <ScreenContainer containerClassName="bg-background">
-        <View style={[styles.header, { backgroundColor: colors.primary }]}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <IconSymbol name="arrow.left" size={22} color="white" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Capturar Protocolo</Text>
-          <View style={{ width: 34 }} />
-        </View>
-        <View style={styles.permissionContainer}>
-          <IconSymbol name="camera.fill" size={64} color={colors.muted} />
-          <Text style={[styles.permissionTitle, { color: colors.foreground }]}>
-            Permiso de cámara requerido
-          </Text>
-          <Text style={[styles.permissionText, { color: colors.muted }]}>
-            Para fotografiar protocolos operatorios y extraer datos automáticamente, necesitamos
-            acceso a tu cámara.
+    if (!permission.granted) {
+      return (
+        <ScreenContainer className="justify-center items-center gap-4">
+          <Text style={{ color: colors.foreground, textAlign: "center" }}>
+            Se necesita acceso a la cámara para capturar fotos
           </Text>
           <TouchableOpacity
             onPress={requestPermission}
-            style={[styles.actionButton, { backgroundColor: colors.primary }]}
+            style={[styles.button, { backgroundColor: colors.primary }]}
           >
-            <Text style={styles.actionButtonText}>Permitir acceso a cámara</Text>
+            <Text style={styles.buttonText}>Permitir acceso</Text>
           </TouchableOpacity>
-          <TouchableOpacity
-            onPress={handlePickFromGallery}
-            style={[styles.outlineButton, { borderColor: colors.primary }]}
-          >
-            <Text style={[styles.outlineButtonText, { color: colors.primary }]}>
-              Seleccionar desde galería
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </ScreenContainer>
-    );
-  }
-
-  // ─── Processing screen ──────────────────────────────────────────────────────
-  if (step === "processing") {
-    return (
-      <ScreenContainer containerClassName="bg-background">
-        <View style={[styles.header, { backgroundColor: colors.primary }]}>
-          <View style={{ width: 34 }} />
-          <Text style={styles.headerTitle}>Procesando con IA...</Text>
-          <View style={{ width: 34 }} />
-        </View>
-        <View style={styles.processingContainer}>
-          {capturedUri && (
-            <Image
-              source={{ uri: capturedUri }}
-              style={styles.processingImage}
-              resizeMode="contain"
-            />
-          )}
-          <View
-            style={[
-              styles.processingOverlay,
-              { backgroundColor: colors.surface, borderTopColor: colors.border },
-            ]}
-          >
-            <ActivityIndicator size="large" color={colors.primary} />
-            <Text style={[styles.processingTitle, { color: colors.foreground }]}>
-              Extrayendo datos con IA...
-            </Text>
-            <Text style={[styles.processingText, { color: colors.muted }]}>
-              Analizando el protocolo operatorio. Esto puede tomar unos segundos.
-            </Text>
-          </View>
-        </View>
-      </ScreenContainer>
-    );
-  }
-
-  // ─── Results screen ─────────────────────────────────────────────────────────
-  if (step === "results" && extractedData) {
-    const fields: { label: string; value: string | null | undefined }[] = [
-      { label: "Nombre del Paciente", value: extractedData.patientName },
-      { label: "RUT", value: extractedData.patientRut },
-      {
-        label: "Fecha",
-        value: extractedData.date
-          ? new Date(extractedData.date).toLocaleDateString("es-CL")
-          : null,
-      },
-      { label: "N° Prestación", value: extractedData.prestacionNumber },
-      { label: "Diagnóstico", value: extractedData.diagnosis },
-      { label: "Procedimiento", value: extractedData.procedureName },
-      { label: "Código", value: extractedData.procedureCode },
-      { label: "Tipo", value: extractedData.type },
-      { label: "Horario", value: extractedData.schedule },
-      { label: "Clínica", value: extractedData.clinic },
-    ];
-
-    const detectedCount = fields.filter((f) => f.value && f.value !== "null").length;
+        </ScreenContainer>
+      );
+    }
 
     return (
-      <ScreenContainer containerClassName="bg-background">
-        <View style={[styles.header, { backgroundColor: colors.primary }]}>
-          <TouchableOpacity onPress={handleRetake} style={styles.backButton}>
-            <IconSymbol name="arrow.left" size={22} color="white" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Datos Extraídos</Text>
-          <View style={{ width: 34 }} />
-        </View>
+      <View style={styles.cameraContainer}>
+        <CameraView ref={cameraRef} style={styles.camera} facing={facing}>
+          <View style={styles.cameraOverlay}>
+            {/* Header */}
+            <View style={[styles.cameraHeader, { backgroundColor: "rgba(0,0,0,0.5)" }]}>
+              <TouchableOpacity onPress={() => router.back()}>
+                <IconSymbol name="chevron.left" size={24} color="white" />
+              </TouchableOpacity>
+              <Text style={styles.cameraHeaderTitle}>Capturar protocolo</Text>
+              <TouchableOpacity onPress={() => setFacing(facing === "back" ? "front" : "back")}>
+                <IconSymbol name="arrow.triangle.2.circlepath" size={24} color="white" />
+              </TouchableOpacity>
+            </View>
 
-        <ScrollView contentContainerStyle={styles.resultsContent}>
-          <View
-            style={[
-              styles.successBanner,
-              { backgroundColor: colors.success + "15", borderColor: colors.success + "40" },
-            ]}
-          >
-            <IconSymbol name="checkmark.circle.fill" size={20} color={colors.success} />
-            <Text style={[styles.successText, { color: colors.success }]}>
-              {detectedCount} campo{detectedCount !== 1 ? "s" : ""} detectado
-              {detectedCount !== 1 ? "s" : ""} automáticamente
-            </Text>
-          </View>
+            {/* Guide frame */}
+            <View style={styles.guideContainer}>
+              <View style={[styles.guideFrame, { borderColor: colors.primary }]} />
+              <Text style={styles.guideText}>Alinea el documento dentro del marco</Text>
+            </View>
 
-          {capturedUri && (
-            <Image
-              source={{ uri: capturedUri }}
-              style={[styles.resultImage, { borderColor: colors.border }]}
-              resizeMode="cover"
-            />
-          )}
-
-          <View
-            style={[
-              styles.fieldsCard,
-              { backgroundColor: colors.surface, borderColor: colors.border },
-            ]}
-          >
-            <Text style={[styles.fieldsTitle, { color: colors.foreground }]}>
-              Revise los datos extraídos
-            </Text>
-            <Text style={[styles.fieldsSubtitle, { color: colors.muted }]}>
-              Podrá editar cualquier campo en el formulario siguiente.
-            </Text>
-            {fields.map((field) => (
-              <View
-                key={field.label}
-                style={[styles.fieldRow, { borderBottomColor: colors.border }]}
+            {/* Bottom buttons */}
+            <View style={[styles.cameraFooter, { backgroundColor: "rgba(0,0,0,0.5)" }]}>
+              <TouchableOpacity
+                onPress={handlePickFromGallery}
+                style={[styles.footerButton, { backgroundColor: colors.surface }]}
               >
-                <Text style={[styles.fieldLabel, { color: colors.muted }]}>{field.label}</Text>
-                <Text
-                  style={[
-                    styles.fieldValue,
-                    {
-                      color:
-                        field.value && field.value !== "null"
-                          ? colors.foreground
-                          : colors.muted,
-                    },
-                  ]}
-                >
-                  {field.value && field.value !== "null" ? field.value : "No detectado"}
-                </Text>
-              </View>
-            ))}
+                <IconSymbol name="photo.fill" size={24} color={colors.primary} />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={handleTakePhoto}
+                style={[styles.captureButton, { backgroundColor: colors.primary }]}
+              >
+                <View style={styles.captureButtonInner} />
+              </TouchableOpacity>
+
+              <View style={styles.footerButton} />
+            </View>
           </View>
+        </CameraView>
+      </View>
+    );
+  }
+
+  if (step === "preview") {
+    return (
+      <ScreenContainer className="bg-background">
+        <View style={[styles.header, { backgroundColor: colors.primary }]}>
+          <TouchableOpacity onPress={() => setStep("camera")}>
+            <IconSymbol name="chevron.left" size={24} color="white" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Vista previa</Text>
+          <View style={{ width: 24 }} />
+        </View>
+
+        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+          {capturedUri && (
+            <Image source={{ uri: capturedUri }} style={styles.previewImage} />
+          )}
+
+          {processingError && (
+            <View style={[styles.errorBox, { backgroundColor: colors.error + "20", borderColor: colors.error }]}>
+              <Text style={[styles.errorText, { color: colors.error }]}>{processingError}</Text>
+            </View>
+          )}
 
           <TouchableOpacity
-            onPress={handleConfirmAndNavigate}
-            style={[styles.actionButton, { backgroundColor: colors.primary }]}
+            onPress={handleProcessOCR}
+            disabled={extractMutation.isPending}
+            style={[
+              styles.button,
+              { backgroundColor: colors.primary, opacity: extractMutation.isPending ? 0.6 : 1 },
+            ]}
           >
-            <IconSymbol name="pencil" size={18} color="white" />
-            <Text style={styles.actionButtonText}>Confirmar y editar en formulario</Text>
+            {extractMutation.isPending ? (
+              <ActivityIndicator color="white" size="small" />
+            ) : (
+              <>
+                <IconSymbol name="sparkles" size={18} color="white" />
+                <Text style={styles.buttonText}>Extraer datos con OCR</Text>
+              </>
+            )}
           </TouchableOpacity>
 
           <TouchableOpacity
-            onPress={handleRetake}
-            style={[styles.outlineButton, { borderColor: colors.border }]}
+            onPress={() => {
+              setCapturedUri(null);
+              setCapturedBase64(null);
+              setStep("camera");
+            }}
+            style={[styles.button, { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }]}
           >
-            <Text style={[styles.outlineButtonText, { color: colors.muted }]}>
-              Tomar otra foto
-            </Text>
+            <Text style={[styles.buttonText, { color: colors.foreground }]}>Tomar otra foto</Text>
           </TouchableOpacity>
         </ScrollView>
       </ScreenContainer>
     );
   }
 
-  // ─── Preview screen ─────────────────────────────────────────────────────────
-  if (step === "preview" && capturedUri) {
+  if (step === "processing") {
     return (
-      <ScreenContainer containerClassName="bg-background">
-        <View style={[styles.header, { backgroundColor: colors.primary }]}>
-          <TouchableOpacity onPress={handleRetake} style={styles.backButton}>
-            <IconSymbol name="arrow.left" size={22} color="white" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Vista previa</Text>
-          <View style={{ width: 34 }} />
-        </View>
-
-        <View style={styles.previewContainer}>
-          <Image source={{ uri: capturedUri }} style={styles.previewImage} resizeMode="contain" />
-
-          <View
-            style={[
-              styles.previewActions,
-              { backgroundColor: colors.surface, borderTopColor: colors.border },
-            ]}
-          >
-            {processingError && (
-              <View
-                style={[
-                  styles.errorBanner,
-                  { backgroundColor: colors.error + "15", borderColor: colors.error + "40" },
-                ]}
-              >
-                <IconSymbol
-                  name="exclamationmark.triangle.fill"
-                  size={16}
-                  color={colors.error}
-                />
-                <Text style={[styles.errorText, { color: colors.error }]}>
-                  {processingError}
-                </Text>
-              </View>
-            )}
-
-            {!capturedBase64 && (
-              <View
-                style={[
-                  styles.errorBanner,
-                  { backgroundColor: colors.warning + "15", borderColor: colors.warning + "40" },
-                ]}
-              >
-                <IconSymbol name="exclamationmark.triangle.fill" size={16} color={colors.warning} />
-                <Text style={[styles.errorText, { color: colors.warning }]}>
-                  No se obtuvo el dato de imagen. Tome otra foto para usar el OCR.
-                </Text>
-              </View>
-            )}
-
-            <Text style={[styles.previewHint, { color: colors.muted }]}>
-              ¿La imagen es legible? Extrae los datos automáticamente o ingresa manualmente.
+      <ScreenContainer className="justify-center items-center">
+        <View style={[styles.processingContainer, { backgroundColor: colors.surface }]}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={[styles.processingText, { color: colors.foreground }]}>
+            Procesando imagen...
+          </Text>
+          {compressionStats && (
+            <Text style={[styles.compressionInfo, { color: colors.muted }]}>
+              {(
+                ((1 - compressionStats.compressed / compressionStats.original) * 100)
+              ).toFixed(0)}
+              % comprimido
             </Text>
-
-            <TouchableOpacity
-              onPress={handleProcessOCR}
-              style={[
-                styles.actionButton,
-                {
-                  backgroundColor: capturedBase64 ? colors.primary : colors.muted,
-                  opacity: capturedBase64 ? 1 : 0.5,
-                },
-              ]}
-              disabled={!capturedBase64}
-            >
-              <IconSymbol name="waveform.path.ecg" size={20} color="white" />
-              <Text style={styles.actionButtonText}>Extraer datos con IA</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={handleManualEntry}
-              style={[styles.outlineButton, { borderColor: colors.primary }]}
-            >
-              <IconSymbol name="pencil" size={18} color={colors.primary} />
-              <Text style={[styles.outlineButtonText, { color: colors.primary }]}>
-                Ingresar datos manualmente
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity onPress={handleRetake} style={styles.retakeButton}>
-              <Text style={[styles.retakeButtonText, { color: colors.muted }]}>
-                Tomar otra foto
-              </Text>
-            </TouchableOpacity>
-          </View>
+          )}
         </View>
       </ScreenContainer>
     );
   }
 
-  // ─── Camera screen ──────────────────────────────────────────────────────────
+  // Results step
   return (
-    <View style={styles.cameraContainer}>
-      <CameraView ref={cameraRef} style={styles.camera} facing={facing}>
-        {/* Header */}
-        <View style={styles.cameraHeader}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.cameraHeaderButton}>
-            <IconSymbol name="xmark" size={22} color="white" />
-          </TouchableOpacity>
-          <Text style={styles.cameraHeaderTitle}>Fotografiar Protocolo</Text>
-          <TouchableOpacity
-            onPress={() => setFacing((f) => (f === "back" ? "front" : "back"))}
-            style={styles.cameraHeaderButton}
-          >
-            <IconSymbol name="arrow.clockwise" size={20} color="white" />
-          </TouchableOpacity>
+    <ScreenContainer className="bg-background">
+      <View style={[styles.header, { backgroundColor: colors.primary }]}>
+        <TouchableOpacity onPress={() => setStep("camera")}>
+          <IconSymbol name="chevron.left" size={24} color="white" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Datos extraídos</Text>
+        <View style={{ width: 24 }} />
+      </View>
+
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        {uploadedPhotoUrl && (
+          <Image source={{ uri: uploadedPhotoUrl }} style={styles.resultImage} />
+        )}
+
+        <View style={[styles.dataContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <Text style={[styles.dataTitle, { color: colors.primary }]}>Datos detectados</Text>
+
+          {extractedData?.patientName && (
+            <View style={styles.dataRow}>
+              <Text style={[styles.dataLabel, { color: colors.muted }]}>Paciente:</Text>
+              <Text style={[styles.dataValue, { color: colors.foreground }]}>{extractedData.patientName}</Text>
+            </View>
+          )}
+          {extractedData?.patientRut && (
+            <View style={styles.dataRow}>
+              <Text style={[styles.dataLabel, { color: colors.muted }]}>RUT:</Text>
+              <Text style={[styles.dataValue, { color: colors.foreground }]}>{extractedData.patientRut}</Text>
+            </View>
+          )}
+          {extractedData?.prestacionNumber && (
+            <View style={styles.dataRow}>
+              <Text style={[styles.dataLabel, { color: colors.muted }]}>Prestación:</Text>
+              <Text style={[styles.dataValue, { color: colors.foreground }]}>{extractedData.prestacionNumber}</Text>
+            </View>
+          )}
+          {extractedData?.diagnosis && (
+            <View style={styles.dataRow}>
+              <Text style={[styles.dataLabel, { color: colors.muted }]}>Diagnóstico:</Text>
+              <Text style={[styles.dataValue, { color: colors.foreground }]}>{extractedData.diagnosis}</Text>
+            </View>
+          )}
+          {extractedData?.procedureName && (
+            <View style={styles.dataRow}>
+              <Text style={[styles.dataLabel, { color: colors.muted }]}>Procedimiento:</Text>
+              <Text style={[styles.dataValue, { color: colors.foreground }]}>{extractedData.procedureName}</Text>
+            </View>
+          )}
+          {extractedData?.clinic && (
+            <View style={styles.dataRow}>
+              <Text style={[styles.dataLabel, { color: colors.muted }]}>Clínica:</Text>
+              <Text style={[styles.dataValue, { color: colors.foreground }]}>{extractedData.clinic}</Text>
+            </View>
+          )}
         </View>
 
-        {/* Guide frame */}
-        <View style={styles.cameraGuide}>
-          <View style={styles.guideFrame}>
-            <View style={[styles.guideCorner, styles.guideCornerTL]} />
-            <View style={[styles.guideCorner, styles.guideCornerTR]} />
-            <View style={[styles.guideCorner, styles.guideCornerBL]} />
-            <View style={[styles.guideCorner, styles.guideCornerBR]} />
-          </View>
-          <Text style={styles.guideText}>
-            Encuadre el protocolo operatorio o ficha clínica
-          </Text>
-        </View>
+        <TouchableOpacity
+          onPress={handleConfirmAndNavigate}
+          style={[styles.button, { backgroundColor: colors.primary }]}
+        >
+          <IconSymbol name="checkmark.circle.fill" size={18} color="white" />
+          <Text style={styles.buttonText}>Continuar con formulario</Text>
+        </TouchableOpacity>
 
-        {/* Controls */}
-        <View style={styles.cameraControls}>
-          <TouchableOpacity onPress={handlePickFromGallery} style={styles.galleryButton}>
-            <IconSymbol name="photo.fill" size={26} color="white" />
-            <Text style={styles.galleryButtonText}>Galería</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity onPress={handleTakePhoto} style={styles.shutterButton}>
-            <View style={styles.shutterInner} />
-          </TouchableOpacity>
-
-          <View style={{ width: 64 }} />
-        </View>
-      </CameraView>
-    </View>
+        <TouchableOpacity
+          onPress={() => setStep("camera")}
+          style={[styles.button, { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }]}
+        >
+          <Text style={[styles.buttonText, { color: colors.foreground }]}>Capturar otra foto</Text>
+        </TouchableOpacity>
+      </ScrollView>
+    </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  center: { flex: 1, justifyContent: "center", alignItems: "center" },
-
-  header: {
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  headerTitle: { fontSize: 17, fontWeight: "600", color: "white" },
-  backButton: { padding: 4 },
-
-  permissionContainer: {
+  cameraContainer: {
     flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 32,
-    gap: 16,
   },
-  permissionTitle: { fontSize: 20, fontWeight: "700", textAlign: "center" },
-  permissionText: { fontSize: 14, textAlign: "center", lineHeight: 20 },
-
-  actionButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    paddingVertical: 14,
-    borderRadius: 12,
-    width: "100%",
+  camera: {
+    flex: 1,
   },
-  actionButtonText: { color: "white", fontWeight: "700", fontSize: 15 },
-  outlineButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    paddingVertical: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    width: "100%",
-  },
-  outlineButtonText: { fontWeight: "600", fontSize: 14 },
-
-  processingContainer: { flex: 1, position: "relative" },
-  processingImage: { flex: 1, opacity: 0.35 },
-  processingOverlay: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    padding: 32,
-    alignItems: "center",
-    gap: 12,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    borderTopWidth: 1,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  processingTitle: { fontSize: 18, fontWeight: "700" },
-  processingText: { fontSize: 13, textAlign: "center", lineHeight: 18 },
-
-  previewContainer: { flex: 1 },
-  previewImage: { flex: 1 },
-  previewActions: {
-    padding: 20,
-    gap: 10,
-    borderTopWidth: 1,
-  },
-  previewHint: { fontSize: 13, textAlign: "center", lineHeight: 18, marginBottom: 4 },
-  retakeButton: { alignItems: "center", paddingVertical: 8 },
-  retakeButtonText: { fontSize: 14 },
-
-  errorBanner: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 8,
-    padding: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-  },
-  errorText: { fontSize: 13, flex: 1, lineHeight: 18 },
-  successBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    padding: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    marginBottom: 4,
-  },
-  successText: { fontSize: 14, fontWeight: "600" },
-
-  resultsContent: { padding: 16, gap: 14, paddingBottom: 40 },
-  resultImage: {
-    width: "100%",
-    height: 160,
-    borderRadius: 10,
-    borderWidth: 1,
-  },
-  fieldsCard: {
-    borderRadius: 12,
-    borderWidth: 1,
-    padding: 16,
-  },
-  fieldsTitle: { fontSize: 15, fontWeight: "600", marginBottom: 4 },
-  fieldsSubtitle: { fontSize: 12, marginBottom: 12, lineHeight: 16 },
-  fieldRow: {
-    flexDirection: "row",
+  cameraOverlay: {
+    flex: 1,
     justifyContent: "space-between",
-    alignItems: "flex-start",
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    gap: 8,
   },
-  fieldLabel: { fontSize: 12, flex: 1, lineHeight: 16 },
-  fieldValue: { fontSize: 13, fontWeight: "500", flex: 2, textAlign: "right", lineHeight: 18 },
-
-  cameraContainer: { flex: 1, backgroundColor: "#000" },
-  camera: { flex: 1 },
   cameraHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: 16,
-    paddingTop: 60,
-    paddingBottom: 16,
-    backgroundColor: "rgba(0,0,0,0.4)",
+    paddingVertical: 12,
   },
-  cameraHeaderButton: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: "rgba(0,0,0,0.4)",
-    justifyContent: "center",
-    alignItems: "center",
+  cameraHeaderTitle: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "600",
   },
-  cameraHeaderTitle: { color: "white", fontSize: 16, fontWeight: "600" },
-  cameraGuide: {
+  guideContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    paddingHorizontal: 32,
+    gap: 12,
   },
   guideFrame: {
-    width: "90%",
-    aspectRatio: 0.75,
-    position: "relative",
-  },
-  guideCorner: {
-    position: "absolute",
-    width: 24,
-    height: 24,
-    borderColor: "rgba(255,255,255,0.8)",
-  },
-  guideCornerTL: { top: 0, left: 0, borderTopWidth: 3, borderLeftWidth: 3 },
-  guideCornerTR: { top: 0, right: 0, borderTopWidth: 3, borderRightWidth: 3 },
-  guideCornerBL: { bottom: 0, left: 0, borderBottomWidth: 3, borderLeftWidth: 3 },
-  guideCornerBR: { bottom: 0, right: 0, borderBottomWidth: 3, borderRightWidth: 3 },
-  guideText: {
-    color: "rgba(255,255,255,0.8)",
-    fontSize: 13,
-    textAlign: "center",
-    marginTop: 16,
-    backgroundColor: "rgba(0,0,0,0.3)",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    width: 280,
+    height: 380,
+    borderWidth: 2,
     borderRadius: 8,
   },
-  cameraControls: {
+  guideText: {
+    color: "white",
+    fontSize: 14,
+    textAlign: "center",
+  },
+  cameraFooter: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    alignItems: "center",
+    paddingVertical: 20,
+  },
+  footerButton: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  captureButton: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  captureButtonInner: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: "white",
+  },
+  header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: 32,
-    paddingBottom: 48,
-    paddingTop: 24,
-    backgroundColor: "rgba(0,0,0,0.4)",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
   },
-  galleryButton: { alignItems: "center", gap: 4, width: 64 },
-  galleryButtonText: { color: "white", fontSize: 11 },
-  shutterButton: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: "rgba(255,255,255,0.3)",
-    justifyContent: "center",
+  headerTitle: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  scrollContent: {
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    gap: 12,
+    paddingBottom: 40,
+  },
+  previewImage: {
+    width: "100%",
+    height: 300,
+    borderRadius: 8,
+    marginBottom: 12,
+  },
+  resultImage: {
+    width: "100%",
+    height: 250,
+    borderRadius: 8,
+    marginBottom: 12,
+  },
+  errorBox: {
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 12,
+  },
+  errorText: {
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  button: {
+    flexDirection: "row",
     alignItems: "center",
-    borderWidth: 3,
-    borderColor: "white",
+    justifyContent: "center",
+    gap: 8,
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
   },
-  shutterInner: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: "white",
+  buttonText: {
+    color: "white",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  processingContainer: {
+    borderRadius: 12,
+    padding: 24,
+    alignItems: "center",
+    gap: 12,
+  },
+  processingText: {
+    fontSize: 16,
+    fontWeight: "500",
+  },
+  compressionInfo: {
+    fontSize: 12,
+    fontStyle: "italic",
+  },
+  dataContainer: {
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 16,
+    gap: 12,
+    marginBottom: 12,
+  },
+  dataTitle: {
+    fontSize: 14,
+    fontWeight: "600",
+    marginBottom: 8,
+  },
+  dataRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 8,
+  },
+  dataLabel: {
+    fontSize: 12,
+    fontWeight: "500",
+  },
+  dataValue: {
+    fontSize: 12,
+    fontWeight: "600",
+    flex: 1,
+    textAlign: "right",
   },
 });

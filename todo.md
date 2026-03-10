@@ -73,3 +73,6 @@
 - [x] Remover asteriscos rojos de campos obligatorios en formulario
 - [x] Agregar buscador en pantalla de procedimientos
 - [x] Agregar período personalizable en exportación con filtro de tipos
+
+## Optimizaciones
+- [x] Mejorar velocidad del OCR: comprimir imagen, indicador de progreso
