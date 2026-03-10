@@ -55,7 +55,8 @@ export default function EditProcedureScreen() {
         procedureCode: data.procedureCode || null,
         notes: data.notes || null,
       });
-      router.back();
+      // Redirect to home screen after updating
+      router.replace("/(tabs)");
     } catch (e) {
       console.error("Failed to update procedure:", e);
     } finally {

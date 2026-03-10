@@ -6,6 +6,7 @@ import {
   SectionList,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -166,6 +167,27 @@ export default function ProceduresScreen() {
         </TouchableOpacity>
       </View>
 
+      {/* Search Bar */}
+      <View style={[styles.searchContainer, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+        <IconSymbol name="magnifyingglass" size={18} color={colors.muted} />
+        <TextInput
+          placeholder="Buscar por nombre, RUT, clínica..."
+          placeholderTextColor={colors.muted + "80"}
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          style={[
+            styles.searchInput,
+            { color: colors.foreground, borderColor: colors.border },
+          ]}
+        />
+        {searchQuery ? (
+          <TouchableOpacity onPress={() => setSearchQuery("")}
+            style={styles.clearButton}>
+            <IconSymbol name="xmark.circle.fill" size={18} color={colors.muted} />
+          </TouchableOpacity>
+        ) : null}
+      </View>
+
       {/* Filter Tabs */}
       <View style={[styles.filterContainer, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
         {filterButtons.map((btn) => (
@@ -262,6 +284,25 @@ const styles = StyleSheet.create({
     color: "white",
   },
   addButton: {
+    padding: 4,
+  },
+  searchContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 8,
+    borderBottomWidth: 1,
+  },
+  searchInput: {
+    flex: 1,
+    height: 36,
+    borderRadius: 8,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    fontSize: 14,
+  },
+  clearButton: {
     padding: 4,
   },
   filterContainer: {

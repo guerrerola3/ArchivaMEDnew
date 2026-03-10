@@ -59,7 +59,6 @@ function FormField({
     <View style={styles.fieldContainer}>
       <Text style={[styles.fieldLabel, { color: colors.muted }]}>
         {label}
-        {required && <Text style={{ color: colors.error }}> *</Text>}
       </Text>
       <TextInput
         value={value}

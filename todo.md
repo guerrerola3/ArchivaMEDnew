@@ -67,3 +67,9 @@
 - [x] Botones de exportación PDF y Excel no hacen nada al presionarlos
 - [x] OCR: reconocer "número de episodio" y "admisión" como equivalentes al campo de prestación
 - [x] OCR: corregir inversión de nombres y apellidos en la detección automática
+
+## Mejoras de UX
+- [x] Redirigir a pantalla principal después de guardar procedimiento
+- [x] Remover asteriscos rojos de campos obligatorios en formulario
+- [x] Agregar buscador en pantalla de procedimientos
+- [x] Agregar período personalizable en exportación con filtro de tipos

@@ -56,7 +56,8 @@ export default function NewProcedureScreen() {
         notes: data.notes || null,
         photoUrl: data.photoUrl,
       });
-      router.back();
+      // Redirect to home screen after saving
+      router.replace("/(tabs)");
     } catch (e) {
       console.error("Failed to add procedure:", e);
     } finally {

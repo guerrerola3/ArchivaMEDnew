@@ -9,6 +9,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -31,6 +32,7 @@ function showError(title: string, message: string, err?: unknown) {
 }
 
 type ExportPeriod = "current_month" | "last_3_months" | "current_year" | "all" | "custom";
+type ProcedureTypeFilter = "all" | "cirugia" | "procedimiento" | "interconsulta";
 
 interface PeriodOption {
   key: ExportPeriod;
@@ -43,6 +45,7 @@ const PERIOD_OPTIONS: PeriodOption[] = [
   { key: "last_3_months", label: "Últimos 3 meses", description: "Los últimos 3 meses" },
   { key: "current_year", label: "Año actual", description: `Todo el año ${new Date().getFullYear()}` },
   { key: "all", label: "Todos", description: "Todos los procedimientos" },
+  { key: "custom", label: "Personalizado", description: "Selecciona un rango de fechas" },
 ];
 
 function formatDate(isoString: string): string {
@@ -96,104 +99,74 @@ function buildExcelData(procedures: LocalProcedure[]) {
 function buildPdfHtml(procedures: LocalProcedure[], periodLabel: string): string {
   const now = new Date().toLocaleDateString("es-CL", {
     day: "2-digit",
-    month: "long",
+    month: "2-digit",
     year: "numeric",
   });
-
-  const stats = {
-    total: procedures.length,
-    cirugias: procedures.filter((p) => p.type === "cirugia").length,
-    procedimientos: procedures.filter((p) => p.type === "procedimiento").length,
-    interconsultas: procedures.filter((p) => p.type === "interconsulta").length,
-    habiles: procedures.filter((p) => p.schedule === "habil").length,
-    inhabiles: procedures.filter((p) => p.schedule === "inhabil").length,
-  };
 
   const rows = procedures
     .map(
       (p) => `
     <tr>
       <td>${formatDate(p.date)}</td>
+      <td>${formatTime(p.date)}</td>
       <td>${p.patientName}</td>
       <td>${p.patientRut}</td>
-      <td>${p.prestacionNumber ?? "-"}</td>
-      <td>${p.diagnosis ?? "-"}</td>
-      <td>${p.procedureName ?? "-"}</td>
-      <td>${p.procedureCode ?? "-"}</td>
-      <td class="badge-${p.type}">${PROCEDURE_TYPE_LABELS[p.type]}</td>
-      <td class="badge-${p.schedule}">${SCHEDULE_TYPE_LABELS[p.schedule]}</td>
+      <td>${p.prestacionNumber ?? ""}</td>
+      <td>${p.diagnosis ?? ""}</td>
+      <td>${p.procedureName ?? ""}</td>
+      <td>${p.procedureCode ?? ""}</td>
+      <td>${PROCEDURE_TYPE_LABELS[p.type]}</td>
+      <td>${SCHEDULE_TYPE_LABELS[p.schedule]}</td>
       <td>${p.clinic}</td>
+      <td>${p.notes ?? ""}</td>
     </tr>
   `
     )
     .join("");
 
   return `<!DOCTYPE html>
-<html lang="es">
+<html>
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>TraumaLog - Reporte de Procedimientos</title>
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: -apple-system, Arial, sans-serif; font-size: 10px; color: #1C2833; background: #fff; }
-    .header { background: #1A5276; color: white; padding: 20px 24px; margin-bottom: 16px; }
-    .header h1 { font-size: 20px; font-weight: 700; }
-    .header p { font-size: 12px; opacity: 0.85; margin-top: 4px; }
-    .summary { display: flex; gap: 12px; padding: 0 24px 16px; flex-wrap: wrap; }
-    .stat-box { background: #F4F6F7; border-radius: 8px; padding: 10px 14px; min-width: 100px; }
-    .stat-box .value { font-size: 22px; font-weight: 700; color: #1A5276; }
-    .stat-box .label { font-size: 10px; color: #5D6D7E; margin-top: 2px; }
-    .table-container { padding: 0 24px 24px; overflow-x: auto; }
-    table { width: 100%; border-collapse: collapse; font-size: 9px; }
-    th { background: #1A5276; color: white; padding: 8px 6px; text-align: left; font-weight: 600; white-space: nowrap; }
-    td { padding: 7px 6px; border-bottom: 1px solid #E5E7EB; vertical-align: top; }
-    tr:nth-child(even) td { background: #F9FAFB; }
-    .badge-cirugia { color: #C0392B; font-weight: 600; }
-    .badge-procedimiento { color: #1A5276; font-weight: 600; }
-    .badge-interconsulta { color: #1E8449; font-weight: 600; }
-    .badge-habil { color: #1E8449; font-weight: 600; }
-    .badge-inhabil { color: #D68910; font-weight: 600; }
-    .footer { text-align: center; color: #5D6D7E; font-size: 9px; padding: 12px; border-top: 1px solid #E5E7EB; }
-    @media print { body { font-size: 9px; } }
+    body { font-family: Arial, sans-serif; margin: 20px; color: #333; }
+    h1 { text-align: center; color: #0a7ea4; margin-bottom: 10px; }
+    .info { text-align: center; color: #666; font-size: 12px; margin-bottom: 20px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+    th { background-color: #0a7ea4; color: white; padding: 10px; text-align: left; font-size: 11px; }
+    td { padding: 8px; border-bottom: 1px solid #ddd; font-size: 10px; }
+    tr:nth-child(even) { background-color: #f9f9f9; }
+    .footer { text-align: center; margin-top: 30px; font-size: 10px; color: #999; border-top: 1px solid #ddd; padding-top: 10px; }
   </style>
 </head>
 <body>
-  <div class="header">
-    <h1>TraumaLog — Reporte de Procedimientos</h1>
-    <p>Período: ${periodLabel} &nbsp;|&nbsp; Generado el ${now}</p>
+  <h1>TraumaLog - Reporte de Procedimientos</h1>
+  <div class="info">
+    <p><strong>Período:</strong> ${periodLabel}</p>
+    <p><strong>Generado:</strong> ${now}</p>
   </div>
 
-  <div class="summary">
-    <div class="stat-box"><div class="value">${stats.total}</div><div class="label">Total</div></div>
-    <div class="stat-box"><div class="value">${stats.cirugias}</div><div class="label">Cirugías</div></div>
-    <div class="stat-box"><div class="value">${stats.procedimientos}</div><div class="label">Procedimientos</div></div>
-    <div class="stat-box"><div class="value">${stats.interconsultas}</div><div class="label">Interconsultas</div></div>
-    <div class="stat-box"><div class="value">${stats.habiles}</div><div class="label">Hábiles</div></div>
-    <div class="stat-box"><div class="value">${stats.inhabiles}</div><div class="label">Inhábiles</div></div>
-  </div>
-
-  <div class="table-container">
-    <table>
-      <thead>
-        <tr>
-          <th>Fecha</th>
-          <th>Paciente</th>
-          <th>RUT</th>
-          <th>N° Prestación</th>
-          <th>Diagnóstico</th>
-          <th>Procedimiento</th>
-          <th>Código</th>
-          <th>Tipo</th>
-          <th>Horario</th>
-          <th>Clínica</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${rows}
-      </tbody>
-    </table>
-  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>Fecha</th>
+        <th>Hora</th>
+        <th>Paciente</th>
+        <th>RUT</th>
+        <th>Prestación</th>
+        <th>Diagnóstico</th>
+        <th>Procedimiento</th>
+        <th>Código</th>
+        <th>Tipo</th>
+        <th>Horario</th>
+        <th>Clínica</th>
+        <th>Notas</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${rows}
+    </tbody>
+  </table>
 
   <div class="footer">TraumaLog &nbsp;|&nbsp; ${procedures.length} procedimientos exportados</div>
 </body>
@@ -205,45 +178,88 @@ export default function ExportScreen() {
   const { procedures } = useProcedures();
   const [selectedPeriod, setSelectedPeriod] = useState<ExportPeriod>("current_month");
   const [isExporting, setIsExporting] = useState<"excel" | "pdf" | null>(null);
+  const [typeFilter, setTypeFilter] = useState<ProcedureTypeFilter>("all");
+  const [customStartDate, setCustomStartDate] = useState<string>("");
+  const [customEndDate, setCustomEndDate] = useState<string>("");
 
   const now = new Date();
   const currentYear = now.getFullYear();
   const currentMonth = now.getMonth() + 1;
 
   const filteredProcedures = useMemo(() => {
+    let result = procedures;
+
+    // Apply period filter
     switch (selectedPeriod) {
       case "current_month":
-        return procedures.filter((p) => {
+        result = result.filter((p) => {
           const d = new Date(p.date);
           return d.getFullYear() === currentYear && d.getMonth() + 1 === currentMonth;
         });
+        break;
       case "last_3_months": {
         const threeMonthsAgo = new Date(now);
         threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
-        return procedures.filter((p) => new Date(p.date) >= threeMonthsAgo);
+        result = result.filter((p) => new Date(p.date) >= threeMonthsAgo);
+        break;
       }
       case "current_year":
-        return procedures.filter((p) => new Date(p.date).getFullYear() === currentYear);
+        result = result.filter((p) => new Date(p.date).getFullYear() === currentYear);
+        break;
+      case "custom":
+        if (customStartDate && customEndDate) {
+          const start = new Date(customStartDate);
+          const end = new Date(customEndDate);
+          end.setHours(23, 59, 59, 999);
+          result = result.filter((p) => {
+            const d = new Date(p.date);
+            return d >= start && d <= end;
+          });
+        }
+        break;
       case "all":
       default:
-        return procedures;
+        break;
     }
-  }, [procedures, selectedPeriod, currentYear, currentMonth]);
+
+    // Apply type filter
+    if (typeFilter !== "all") {
+      result = result.filter((p) => p.type === typeFilter);
+    }
+
+    return result;
+  }, [procedures, selectedPeriod, currentYear, currentMonth, typeFilter, customStartDate, customEndDate, now]);
 
   const periodLabel = useMemo(() => {
+    let label = "";
     switch (selectedPeriod) {
       case "current_month":
-        return `${MONTHS_ES[currentMonth - 1]} ${currentYear}`;
+        label = `${MONTHS_ES[currentMonth - 1]} ${currentYear}`;
+        break;
       case "last_3_months":
-        return "Últimos 3 meses";
+        label = "Últimos 3 meses";
+        break;
       case "current_year":
-        return `Año ${currentYear}`;
+        label = `Año ${currentYear}`;
+        break;
+      case "custom":
+        label = customStartDate && customEndDate ? `${customStartDate} a ${customEndDate}` : "Personalizado";
+        break;
       case "all":
-        return "Todos los procedimientos";
       default:
-        return "";
+        label = "Todos los procedimientos";
     }
-  }, [selectedPeriod, currentYear, currentMonth]);
+    if (typeFilter !== "all") {
+      const typeLabels: Record<ProcedureTypeFilter, string> = {
+        all: "Todos",
+        cirugia: "Cirugías",
+        procedimiento: "Procedimientos",
+        interconsulta: "Interconsultas",
+      };
+      label += ` - ${typeLabels[typeFilter]}`;
+    }
+    return label;
+  }, [selectedPeriod, currentYear, currentMonth, typeFilter, customStartDate, customEndDate]);
 
   const handleExportExcel = async () => {
     if (filteredProcedures.length === 0) {
@@ -253,43 +269,20 @@ export default function ExportScreen() {
 
     setIsExporting("excel");
     try {
-      // Build workbook
       const data = buildExcelData(filteredProcedures);
       const ws = utils.aoa_to_sheet(data);
-      ws["!cols"] = [
-        { wch: 12 }, { wch: 8 }, { wch: 28 }, { wch: 14 }, { wch: 14 },
-        { wch: 30 }, { wch: 30 }, { wch: 12 }, { wch: 16 }, { wch: 10 },
-        { wch: 22 }, { wch: 30 },
-      ];
       const wb = utils.book_new();
       utils.book_append_sheet(wb, ws, "Procedimientos");
 
-      const summaryData = [
-        ["RESUMEN - " + periodLabel],
-        [""],
-        ["Total procedimientos", filteredProcedures.length],
-        ["Cirugías", filteredProcedures.filter((p) => p.type === "cirugia").length],
-        ["Procedimientos", filteredProcedures.filter((p) => p.type === "procedimiento").length],
-        ["Interconsultas", filteredProcedures.filter((p) => p.type === "interconsulta").length],
-        [""],
-        ["Horario hábil", filteredProcedures.filter((p) => p.schedule === "habil").length],
-        ["Horario inhábil", filteredProcedures.filter((p) => p.schedule === "inhabil").length],
-      ];
-      const wsSummary = utils.aoa_to_sheet(summaryData);
-      wsSummary["!cols"] = [{ wch: 25 }, { wch: 10 }];
-      utils.book_append_sheet(wb, wsSummary, "Resumen");
+      const wbout = write(wb, { bookType: "xlsx", type: "base64" });
 
-      // Write to base64 and save to documentDirectory
-      const xlsxBase64 = write(wb, { type: "base64", bookType: "xlsx" });
       const safeLabel = periodLabel.replace(/[^a-zA-Z0-9_\-]/g, "_");
-      const fileName = `TraumaLog_${safeLabel}_${Date.now()}.xlsx`;
-      const fileUri = `${FileSystem.documentDirectory}${fileName}`;
+      const fileUri = `${FileSystem.documentDirectory}TraumaLog_${safeLabel}_${Date.now()}.xlsx`;
 
-      await FileSystem.writeAsStringAsync(fileUri, xlsxBase64, {
+      await FileSystem.writeAsStringAsync(fileUri, wbout, {
         encoding: FileSystem.EncodingType.Base64,
       });
 
-      // Share the file — shareAsync works directly with the file URI on iOS/Android
       const sharingAvailable = await Sharing.isAvailableAsync();
       if (sharingAvailable) {
         await Sharing.shareAsync(fileUri, {
@@ -429,6 +422,76 @@ export default function ExportScreen() {
           ))}
         </View>
 
+        {/* Custom Date Range (if custom period selected) */}
+        {selectedPeriod === "custom" && (
+          <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Text style={[styles.sectionTitle, { color: colors.primary }]}>Rango personalizado</Text>
+            <View style={styles.dateInputRow}>
+              <View style={styles.dateInputContainer}>
+                <Text style={[styles.dateLabel, { color: colors.muted }]}>Desde</Text>
+                <TextInput
+                  placeholder="YYYY-MM-DD"
+                  placeholderTextColor={colors.muted + "80"}
+                  value={customStartDate}
+                  onChangeText={setCustomStartDate}
+                  style={[
+                    styles.dateInput,
+                    { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.surface },
+                  ]}
+                />
+              </View>
+              <View style={styles.dateInputContainer}>
+                <Text style={[styles.dateLabel, { color: colors.muted }]}>Hasta</Text>
+                <TextInput
+                  placeholder="YYYY-MM-DD"
+                  placeholderTextColor={colors.muted + "80"}
+                  value={customEndDate}
+                  onChangeText={setCustomEndDate}
+                  style={[
+                    styles.dateInput,
+                    { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.surface },
+                  ]}
+                />
+              </View>
+            </View>
+          </View>
+        )}
+
+        {/* Type Filter */}
+        <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <Text style={[styles.sectionTitle, { color: colors.primary }]}>Filtrar por tipo</Text>
+          {[
+            { key: "all" as ProcedureTypeFilter, label: "Todos" },
+            { key: "cirugia" as ProcedureTypeFilter, label: "Cirugías" },
+            { key: "procedimiento" as ProcedureTypeFilter, label: "Procedimientos" },
+            { key: "interconsulta" as ProcedureTypeFilter, label: "Interconsultas" },
+          ].map((opt) => (
+            <TouchableOpacity
+              key={opt.key}
+              onPress={() => setTypeFilter(opt.key)}
+              style={[
+                styles.typeOption,
+                { borderColor: typeFilter === opt.key ? colors.primary : colors.border },
+                typeFilter === opt.key && { backgroundColor: colors.primary + "10" },
+              ]}
+            >
+              <Text style={[styles.typeOptionLabel, { color: colors.foreground }]}>
+                {opt.label}
+              </Text>
+              <View
+                style={[
+                  styles.checkboxOuter,
+                  { borderColor: typeFilter === opt.key ? colors.primary : colors.border },
+                ]}
+              >
+                {typeFilter === opt.key && (
+                  <View style={[styles.checkboxInner, { backgroundColor: colors.primary }]} />
+                )}
+              </View>
+            </TouchableOpacity>
+          ))}
+        </View>
+
         {/* Summary */}
         <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <Text style={[styles.sectionTitle, { color: colors.primary }]}>Resumen del período</Text>
@@ -444,7 +507,7 @@ export default function ExportScreen() {
               <Text style={[styles.statLabel, { color: colors.muted }]}>Cirugías</Text>
             </View>
             <View style={[styles.statItem, { backgroundColor: colors.background }]}>
-              <Text style={[styles.statValue, { color: colors.primary }]}>{stats.procedimientos}</Text>
+              <Text style={[styles.statValue, { color: colors.warning }]}>{stats.procedimientos}</Text>
               <Text style={[styles.statLabel, { color: colors.muted }]}>Procedim.</Text>
             </View>
             <View style={[styles.statItem, { backgroundColor: colors.background }]}>
@@ -454,87 +517,58 @@ export default function ExportScreen() {
           </View>
         </View>
 
-        {/* Export Actions */}
+        {/* Export Buttons */}
         <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <Text style={[styles.sectionTitle, { color: colors.primary }]}>Formato de exportación</Text>
+          <Text style={[styles.sectionTitle, { color: colors.primary }]}>Exportar datos</Text>
 
-          {/* Excel */}
           <TouchableOpacity
             onPress={handleExportExcel}
             disabled={isExporting !== null}
             style={[
               styles.exportButton,
-              { backgroundColor: "#217346", opacity: isExporting !== null ? 0.6 : 1 },
+              { backgroundColor: colors.primary, opacity: isExporting === "excel" ? 0.6 : 1 },
             ]}
           >
             {isExporting === "excel" ? (
               <ActivityIndicator color="white" size="small" />
             ) : (
-              <IconSymbol name="tablecells.fill" size={22} color="white" />
+              <IconSymbol name="tablecells" size={20} color="white" />
             )}
-            <View style={styles.exportButtonContent}>
-              <Text style={styles.exportButtonTitle}>Exportar a Excel</Text>
-              <Text style={styles.exportButtonSubtitle}>
-                Archivo .xlsx con hoja de datos y resumen
-              </Text>
-            </View>
-            <IconSymbol name="square.and.arrow.up.fill" size={18} color="rgba(255,255,255,0.8)" />
+            <Text style={styles.exportButtonText}>
+              {isExporting === "excel" ? "Generando..." : "Exportar a Excel"}
+            </Text>
           </TouchableOpacity>
 
-          {/* PDF */}
           <TouchableOpacity
             onPress={handleExportPdf}
             disabled={isExporting !== null}
             style={[
               styles.exportButton,
-              { backgroundColor: "#C0392B", opacity: isExporting !== null ? 0.6 : 1 },
+              { backgroundColor: colors.primary, opacity: isExporting === "pdf" ? 0.6 : 1 },
             ]}
           >
             {isExporting === "pdf" ? (
               <ActivityIndicator color="white" size="small" />
             ) : (
-              <IconSymbol name="doc.richtext.fill" size={22} color="white" />
+              <IconSymbol name="doc.fill" size={20} color="white" />
             )}
-            <View style={styles.exportButtonContent}>
-              <Text style={styles.exportButtonTitle}>Exportar a PDF</Text>
-              <Text style={styles.exportButtonSubtitle}>
-                Reporte completo con estadísticas y tabla
-              </Text>
-            </View>
-            <IconSymbol name="square.and.arrow.up.fill" size={18} color="rgba(255,255,255,0.8)" />
+            <Text style={styles.exportButtonText}>
+              {isExporting === "pdf" ? "Generando..." : "Exportar a PDF"}
+            </Text>
           </TouchableOpacity>
 
-          {/* Print */}
-          {Platform.OS !== "web" && (
-            <TouchableOpacity
-              onPress={handlePrint}
-              disabled={isExporting !== null}
-              style={[
-                styles.exportButton,
-                { backgroundColor: colors.foreground, opacity: isExporting !== null ? 0.6 : 1 },
-              ]}
-            >
-              <IconSymbol name="printer.fill" size={22} color="white" />
-              <View style={styles.exportButtonContent}>
-                <Text style={styles.exportButtonTitle}>Imprimir</Text>
-                <Text style={styles.exportButtonSubtitle}>
-                  Enviar a impresora o guardar como PDF
-                </Text>
-              </View>
-              <IconSymbol name="chevron.right" size={18} color="rgba(255,255,255,0.8)" />
-            </TouchableOpacity>
-          )}
+          <TouchableOpacity
+            onPress={handlePrint}
+            disabled={isExporting !== null}
+            style={[
+              styles.exportButton,
+              { backgroundColor: colors.primary, opacity: isExporting ? 0.6 : 1 },
+            ]}
+          >
+            <IconSymbol name="printer.fill" size={20} color="white" />
+            <Text style={styles.exportButtonText}>Imprimir</Text>
+          </TouchableOpacity>
         </View>
-
-        {filteredProcedures.length === 0 && (
-          <View style={[styles.emptyState, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <IconSymbol name="doc.text.fill" size={40} color={colors.muted} />
-            <Text style={[styles.emptyTitle, { color: colors.foreground }]}>Sin datos</Text>
-            <Text style={[styles.emptyText, { color: colors.muted }]}>
-              No hay procedimientos en el período seleccionado
-            </Text>
-          </View>
-        )}
       </ScrollView>
     </ScreenContainer>
   );
@@ -544,6 +578,9 @@ const styles = StyleSheet.create({
   header: {
     paddingHorizontal: 20,
     paddingVertical: 16,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   headerTitle: {
     fontSize: 20,
@@ -551,40 +588,41 @@ const styles = StyleSheet.create({
     color: "white",
   },
   scrollContent: {
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    gap: 16,
     paddingBottom: 40,
-    gap: 12,
   },
   section: {
-    borderRadius: 14,
-    padding: 16,
+    borderRadius: 12,
     borderWidth: 1,
+    padding: 16,
+    gap: 12,
   },
   sectionTitle: {
-    fontSize: 12,
-    fontWeight: "700",
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-    marginBottom: 12,
+    fontSize: 16,
+    fontWeight: "600",
+    marginBottom: 4,
   },
   periodOption: {
     flexDirection: "row",
+    justifyContent: "space-between",
     alignItems: "center",
-    padding: 12,
-    borderRadius: 10,
-    borderWidth: 1.5,
-    marginBottom: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderRadius: 8,
+    borderWidth: 1,
   },
   periodOptionContent: {
     flex: 1,
   },
   periodOptionLabel: {
-    fontSize: 15,
-    fontWeight: "600",
+    fontSize: 14,
+    fontWeight: "500",
+    marginBottom: 4,
   },
   periodOptionDesc: {
     fontSize: 12,
-    marginTop: 2,
   },
   radioOuter: {
     width: 20,
@@ -599,9 +637,54 @@ const styles = StyleSheet.create({
     height: 10,
     borderRadius: 5,
   },
+  dateInputRow: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  dateInputContainer: {
+    flex: 1,
+  },
+  dateLabel: {
+    fontSize: 12,
+    fontWeight: "500",
+    marginBottom: 6,
+  },
+  dateInput: {
+    borderRadius: 8,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    fontSize: 14,
+  },
+  typeOption: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  typeOptionLabel: {
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  checkboxOuter: {
+    width: 20,
+    height: 20,
+    borderRadius: 4,
+    borderWidth: 2,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  checkboxInner: {
+    width: 10,
+    height: 10,
+    borderRadius: 2,
+  },
   periodLabelText: {
-    fontSize: 16,
-    fontWeight: "600",
+    fontSize: 14,
+    fontWeight: "500",
     marginBottom: 12,
   },
   statsRow: {
@@ -610,54 +693,32 @@ const styles = StyleSheet.create({
   },
   statItem: {
     flex: 1,
-    borderRadius: 10,
-    padding: 10,
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
     alignItems: "center",
   },
   statValue: {
-    fontSize: 22,
+    fontSize: 18,
     fontWeight: "700",
+    marginBottom: 4,
   },
   statLabel: {
-    fontSize: 10,
-    marginTop: 2,
-    textAlign: "center",
+    fontSize: 11,
+    fontWeight: "500",
   },
   exportButton: {
     flexDirection: "row",
     alignItems: "center",
-    padding: 14,
-    borderRadius: 12,
-    gap: 12,
-    marginBottom: 10,
+    justifyContent: "center",
+    gap: 10,
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
   },
-  exportButtonContent: {
-    flex: 1,
-  },
-  exportButtonTitle: {
+  exportButtonText: {
     color: "white",
-    fontSize: 15,
-    fontWeight: "700",
-  },
-  exportButtonSubtitle: {
-    color: "rgba(255,255,255,0.75)",
-    fontSize: 11,
-    marginTop: 2,
-  },
-  emptyState: {
-    borderRadius: 14,
-    padding: 32,
-    alignItems: "center",
-    borderWidth: 1,
-    borderStyle: "dashed",
-    gap: 8,
-  },
-  emptyTitle: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: "600",
-  },
-  emptyText: {
-    fontSize: 13,
-    textAlign: "center",
   },
 });
