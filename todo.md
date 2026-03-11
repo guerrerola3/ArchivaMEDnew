@@ -77,3 +77,7 @@
 ## Optimizaciones
 - [x] Mejorar velocidad del OCR: comprimir imagen, indicador de progreso
 - [x] OCR: detectar descripción del procedimiento quirúrgico en el campo de notas
+
+## Branding
+- [x] Actualizar logo a ArchivaMED (neon medical icon)
+- [x] Cambiar nombre de app a "ArchivaMED"
