@@ -126,7 +126,7 @@ export default function HomeScreen() {
         <View style={[styles.header, { backgroundColor: colors.primary }]}>
           <View>
             <Text style={styles.headerGreeting}>
-              {isAuthenticated ? `Hola, Dr. ${user?.name?.split(" ")[0] ?? ""}` : "TraumaLog"}
+              {isAuthenticated ? `Hola, Dr. ${user?.name?.split(" ")[0] ?? ""}` : "ArchivaMED"}
             </Text>
             <Text style={styles.headerSubtitle}>
               {MONTHS_ES[currentMonth - 1]} {currentYear}

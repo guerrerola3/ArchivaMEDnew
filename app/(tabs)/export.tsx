@@ -140,7 +140,7 @@ function buildPdfHtml(procedures: LocalProcedure[], periodLabel: string): string
   </style>
 </head>
 <body>
-  <h1>TraumaLog - Reporte de Procedimientos</h1>
+  <h1>ArchivaMED - Reporte de Procedimientos</h1>
   <div class="info">
     <p><strong>Período:</strong> ${periodLabel}</p>
     <p><strong>Generado:</strong> ${now}</p>
@@ -168,7 +168,7 @@ function buildPdfHtml(procedures: LocalProcedure[], periodLabel: string): string
     </tbody>
   </table>
 
-  <div class="footer">TraumaLog &nbsp;|&nbsp; ${procedures.length} procedimientos exportados</div>
+  <div class="footer">ArchivaMED &nbsp;|&nbsp; ${procedures.length} procedimientos exportados</div>
 </body>
 </html>`;
 }
@@ -277,7 +277,7 @@ export default function ExportScreen() {
       const wbout = write(wb, { bookType: "xlsx", type: "base64" });
 
       const safeLabel = periodLabel.replace(/[^a-zA-Z0-9_\-]/g, "_");
-      const fileUri = `${FileSystem.documentDirectory}TraumaLog_${safeLabel}_${Date.now()}.xlsx`;
+      const fileUri = `${FileSystem.documentDirectory}ArchivaMED_${safeLabel}_${Date.now()}.xlsx`;
 
       await FileSystem.writeAsStringAsync(fileUri, wbout, {
         encoding: FileSystem.EncodingType.Base64,
@@ -332,7 +332,7 @@ export default function ExportScreen() {
       } else {
         // Fallback: move to documentDirectory and inform user
         const safeLabel = periodLabel.replace(/[^a-zA-Z0-9_\-]/g, "_");
-        const destUri = `${FileSystem.documentDirectory}TraumaLog_${safeLabel}_${Date.now()}.pdf`;
+        const destUri = `${FileSystem.documentDirectory}ArchivaMED_${safeLabel}_${Date.now()}.pdf`;
         await FileSystem.moveAsync({ from: uri, to: destUri });
         Alert.alert(
           "PDF generado",

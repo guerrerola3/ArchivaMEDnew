@@ -81,3 +81,7 @@
 ## Branding
 - [x] Actualizar logo a ArchivaMED (neon medical icon)
 - [x] Cambiar nombre de app a "ArchivaMED"
+
+## Bugs
+- [x] Logo antiguo sigue apareciendo en launch - necesita reinicio del servidor y limpieza de caché
+- [x] Nombre "TraumaLog" sigue apareciendo en la página principal - necesita actualización de la pantalla
