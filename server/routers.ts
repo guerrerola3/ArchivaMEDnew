@@ -118,6 +118,7 @@ INSTRUCCIONES CRÍTICAS:
 3. FECHA: Busca en formato DD/MM/YYYY, DD-MM-YYYY o similar. Convierte a ISO 8601 (YYYY-MM-DDTHH:mm:ss.000Z). Si solo hay fecha sin hora, usa 00:00:00.
 4. TIPO: Identifica si es una cirugía, procedimiento diagnóstico/terapéutico, o interconsulta.
 5. HORARIO: Determina si fue en horario hábil (lunes-viernes 8:00-17:00) o inhábil basándote en la fecha/hora si está disponible.
+6. DESCRIPCIÓN DEL PROCEDIMIENTO: Busca secciones tituladas "Descripción del Procedimiento", "Hallazgos Quirúrgicos", "Protocolo Quirúrgico", "Procedimiento Realizado", "Descripción de la Intervención", "Acto Quirúrgico" o "Tcnica Quirúrgica". Extrae el texto descriptivo completo (puede ser un párrafo largo con detalles de lo realizado). Este texto va en el campo "notes".
 
 Analiza la imagen y extrae los siguientes datos en formato JSON:
 - patientName: Nombre completo del paciente (en orden natural: Nombre Apellido, NO invertido)
@@ -130,7 +131,7 @@ Analiza la imagen y extrae los siguientes datos en formato JSON:
 - type: Tipo (exactamente: "cirugia", "procedimiento", o "interconsulta")
 - schedule: Horario (exactamente: "habil" o "inhabil")
 - clinic: Nombre de la clínica u hospital
-- notes: Observaciones adicionales
+- notes: Descripción completa del procedimiento/hallazgos quirúrgicos (texto de la sección de descripción si existe, puede ser largo)
 
 Si no puedes leer algún campo, déjalo como null.
 Responde SOLO con el JSON válido, sin texto adicional.`;
@@ -141,12 +142,12 @@ Responde SOLO con el JSON válido, sin texto adicional.`;
             {
               role: "user",
               content: [
-                { type: "text", text: "Extrae TODOS los datos de este protocolo operatorio o ficha clínica chilena. IMPORTANTE: (1) El nombre del paciente debe estar en orden natural (Nombre Apellido), NO invertido. (2) Busca cualquier campo que diga 'Número de Episodio', 'Admisión', 'N° Episodio' o similar - son equivalentes a 'Número de Prestación'. Responde SOLO con JSON válido." },
+                { type: "text", text: "Extrae TODOS los datos de este protocolo operatorio o ficha clínica chilena. IMPORTANTE: (1) El nombre del paciente debe estar en orden natural (Nombre Apellido), NO invertido. (2) Busca cualquier campo que diga 'Número de Episodio', 'Admisión', 'N° Episodio' o similar - son equivalentes a 'Número de Prestación'. (3) En el campo 'notes', extrae la descripción completa del procedimiento/hallazgos quirúrgicos si existe. Responde SOLO con JSON válido." },
                 { type: "image_url", image_url: { url: `data:${input.mimeType};base64,${input.imageBase64}`, detail: "high" } },
               ],
             },
           ],
-          maxTokens: 1000,
+          maxTokens: 2000,
         });
 
         const responseText = llmResult.choices?.[0]?.message?.content;
