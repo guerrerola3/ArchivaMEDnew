@@ -53,11 +53,32 @@ function ProcedureListItem({
       onPress={onPress}
       onLongPress={() => {
         Alert.alert(
-          "Eliminar procedimiento",
-          `¿Eliminar el procedimiento de ${item.patientName}?`,
+          item.patientName,
+          "Opciones de procedimiento",
           [
+            {
+              text: item.invoiceIssued ? "✓ Boleta realizada" : "○ Marcar boleta",
+              onPress: () => onToggleInvoice?.(!item.invoiceIssued),
+            },
+            {
+              text: item.isPaid ? "✓ Pagado" : "○ Marcar pagado",
+              onPress: () => onTogglePaid?.(!item.isPaid),
+            },
+            {
+              text: "Eliminar",
+              style: "destructive",
+              onPress: () => {
+                Alert.alert(
+                  "Eliminar procedimiento",
+                  `¿Eliminar el procedimiento de ${item.patientName}?`,
+                  [
+                    { text: "Cancelar", style: "cancel" },
+                    { text: "Eliminar", style: "destructive", onPress: onDelete },
+                  ]
+                );
+              },
+            },
             { text: "Cancelar", style: "cancel" },
-            { text: "Eliminar", style: "destructive", onPress: onDelete },
           ]
         );
       }}
@@ -86,18 +107,16 @@ function ProcedureListItem({
               {scheduleLabel}
             </Text>
           </View>
-          <TouchableOpacity
-            onPress={() => onToggleInvoice?.(!item.invoiceIssued)}
-            style={[styles.paymentBadge, { backgroundColor: item.invoiceIssued ? colors.primary + "15" : colors.border + "40" }]}
-          >
-            <Text style={[styles.paymentBadgeText, { color: item.invoiceIssued ? colors.primary : colors.muted }]}>📄</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => onTogglePaid?.(!item.isPaid)}
-            style={[styles.paymentBadge, { backgroundColor: item.isPaid ? colors.success + "15" : colors.border + "40" }]}
-          >
-            <Text style={[styles.paymentBadgeText, { color: item.isPaid ? colors.success : colors.muted }]}>✓</Text>
-          </TouchableOpacity>
+          {item.invoiceIssued && (
+            <View style={[styles.smallBadge, { backgroundColor: colors.primary + "15" }]}>
+              <Text style={[styles.smallBadgeText, { color: colors.primary }]}>Boleta</Text>
+            </View>
+          )}
+          {item.isPaid && (
+            <View style={[styles.smallBadge, { backgroundColor: colors.success + "15" }]}>
+              <Text style={[styles.smallBadgeText, { color: colors.success }]}>Pagado</Text>
+            </View>
+          )}
           {item.clinic ? (
             <Text style={[styles.clinicText, { color: colors.muted }]} numberOfLines={1}>
               {item.clinic}

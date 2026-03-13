@@ -62,7 +62,7 @@ function formatTime(isoString: string): string {
   return d.toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" });
 }
 
-function buildExcelData(procedures: LocalProcedure[]) {
+function buildExcelData(procedures: LocalProcedure[], includeNotes: boolean = true) {
   const headers = [
     "Fecha",
     "Hora",
@@ -75,7 +75,7 @@ function buildExcelData(procedures: LocalProcedure[]) {
     "Tipo",
     "Horario",
     "Clínica",
-    "Notas",
+    ...(includeNotes ? ["Notas"] : []),
     "Boleta Realizada",
     "Pagado",
   ];
@@ -92,7 +92,7 @@ function buildExcelData(procedures: LocalProcedure[]) {
     PROCEDURE_TYPE_LABELS[p.type],
     SCHEDULE_TYPE_LABELS[p.schedule],
     p.clinic,
-    p.notes ?? "",
+    ...(includeNotes ? [p.notes ?? ""] : []),
     p.invoiceIssued ? "Sí" : "No",
     p.isPaid ? "Sí" : "No",
   ]);
@@ -100,7 +100,7 @@ function buildExcelData(procedures: LocalProcedure[]) {
   return [headers, ...rows];
 }
 
-function buildPdfHtml(procedures: LocalProcedure[], periodLabel: string): string {
+function buildPdfHtml(procedures: LocalProcedure[], periodLabel: string, includeNotes: boolean = true): string {
   const now = new Date().toLocaleDateString("es-CL", {
     day: "2-digit",
     month: "2-digit",
@@ -122,7 +122,7 @@ function buildPdfHtml(procedures: LocalProcedure[], periodLabel: string): string
       <td>${PROCEDURE_TYPE_LABELS[p.type]}</td>
       <td>${SCHEDULE_TYPE_LABELS[p.schedule]}</td>
       <td>${p.clinic}</td>
-      <td>${p.notes ?? ""}</td>
+      ${includeNotes ? `<td>${p.notes ?? ""}</td>` : ""}
       <td>${p.invoiceIssued ? "Sí" : "No"}</td>
       <td>${p.isPaid ? "Sí" : "No"}</td>
     </tr>
@@ -166,7 +166,7 @@ function buildPdfHtml(procedures: LocalProcedure[], periodLabel: string): string
         <th>Tipo</th>
         <th>Horario</th>
         <th>Clínica</th>
-        <th>Notas</th>
+        ${includeNotes ? "<th>Notas</th>" : ""}
         <th>Boleta</th>
         <th>Pagado</th>
       </tr>
@@ -189,6 +189,7 @@ export default function ExportScreen() {
   const [typeFilter, setTypeFilter] = useState<ProcedureTypeFilter>("all");
   const [customStartDate, setCustomStartDate] = useState<string>("");
   const [customEndDate, setCustomEndDate] = useState<string>("");
+  const [includeNotes, setIncludeNotes] = useState<boolean>(true);
 
   const now = new Date();
   const currentYear = now.getFullYear();
@@ -236,7 +237,7 @@ export default function ExportScreen() {
     }
 
     return result;
-  }, [procedures, selectedPeriod, currentYear, currentMonth, typeFilter, customStartDate, customEndDate, now]);
+  }, [procedures, selectedPeriod, currentYear, currentMonth, typeFilter, customStartDate, customEndDate, now, includeNotes]);
 
   const periodLabel = useMemo(() => {
     let label = "";
@@ -277,7 +278,7 @@ export default function ExportScreen() {
 
     setIsExporting("excel");
     try {
-      const data = buildExcelData(filteredProcedures);
+      const data = buildExcelData(filteredProcedures, includeNotes);
       const ws = utils.aoa_to_sheet(data);
       const wb = utils.book_new();
       utils.book_append_sheet(wb, ws, "Procedimientos");
@@ -324,7 +325,7 @@ export default function ExportScreen() {
 
     setIsExporting("pdf");
     try {
-      const html = buildPdfHtml(filteredProcedures, periodLabel);
+      const html = buildPdfHtml(filteredProcedures, periodLabel, includeNotes);
 
       // printToFileAsync saves to cache dir — share directly from that URI
       const { uri } = await Print.printToFileAsync({ html });
@@ -366,7 +367,7 @@ export default function ExportScreen() {
     }
 
     try {
-      const html = buildPdfHtml(filteredProcedures, periodLabel);
+      const html = buildPdfHtml(filteredProcedures, periodLabel, includeNotes);
       if (Platform.OS === "web") {
         await Print.printAsync({});
       } else {
@@ -523,6 +524,33 @@ export default function ExportScreen() {
               <Text style={[styles.statLabel, { color: colors.muted }]}>Interconsult.</Text>
             </View>
           </View>
+        </View>
+
+        {/* Export Options */}
+        <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <Text style={[styles.sectionTitle, { color: colors.primary }]}>Opciones de exportación</Text>
+          <TouchableOpacity
+            onPress={() => setIncludeNotes(!includeNotes)}
+            style={[styles.optionRow, { borderColor: colors.border }]}
+          >
+            <Text style={[styles.optionLabel, { color: colors.foreground }]}>Incluir notas</Text>
+            <View
+              style={[
+                styles.toggleSwitch,
+                { backgroundColor: includeNotes ? colors.primary : colors.border },
+              ]}
+            >
+              <View
+                style={[
+                  styles.toggleThumb,
+                  { transform: [{ translateX: includeNotes ? 20 : 0 }] },
+                ]}
+              />
+            </View>
+          </TouchableOpacity>
+          <Text style={[styles.optionHint, { color: colors.muted }]}>
+            {includeNotes ? "Las notas se incluirán en la exportación" : "Las notas se excluirán para reducir el tamaño del archivo"}
+          </Text>
         </View>
 
         {/* Export Buttons */}
@@ -728,5 +756,42 @@ const styles = StyleSheet.create({
     color: "white",
     fontSize: 14,
     fontWeight: "600",
+  },
+  optionRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    marginBottom: 8,
+  },
+  optionLabel: {
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  toggleSwitch: {
+    width: 50,
+    height: 28,
+    borderRadius: 14,
+    justifyContent: "center",
+    paddingHorizontal: 2,
+  },
+  toggleThumb: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: "white",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  optionHint: {
+    fontSize: 12,
+    marginTop: 8,
+    marginHorizontal: 12,
   },
 });
