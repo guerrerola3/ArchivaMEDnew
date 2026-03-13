@@ -27,6 +27,8 @@ export interface ProcedureFormData {
   clinic: string;
   notes: string;
   photoUrl?: string | null;
+  invoiceIssued?: boolean;
+  isPaid?: boolean;
 }
 
 interface ProcedureFormProps {
@@ -215,10 +217,16 @@ export function ProcedureForm({
     clinic: initialData?.clinic ?? "",
     notes: initialData?.notes ?? "",
     photoUrl: initialData?.photoUrl,
+    invoiceIssued: initialData?.invoiceIssued ?? false,
+    isPaid: initialData?.isPaid ?? false,
   });
 
-  const update = (field: keyof ProcedureFormData, value: string) => {
+  const update = (field: keyof ProcedureFormData, value: string | boolean) => {
     setForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const togglePaymentField = (field: "invoiceIssued" | "isPaid") => {
+    setForm((prev) => ({ ...prev, [field]: !prev[field] }));
   };
 
   const handleSubmit = async () => {
@@ -347,6 +355,53 @@ export function ProcedureForm({
           />
         </View>
 
+        {/* Section: Estado de Pago */}
+        <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <Text style={[styles.sectionTitle, { color: colors.primary }]}>Estado de Pago</Text>
+          <TouchableOpacity
+            onPress={() => togglePaymentField("invoiceIssued")}
+            style={[styles.checkboxRow, { borderColor: colors.border }]}
+          >
+            <View
+              style={[
+                styles.checkbox,
+                {
+                  backgroundColor: form.invoiceIssued ? colors.primary : colors.surface,
+                  borderColor: colors.primary,
+                },
+              ]}
+            >
+              {form.invoiceIssued && (
+                <Text style={{ color: "white", fontSize: 14, fontWeight: "700" }}>✓</Text>
+              )}
+            </View>
+            <Text style={[styles.checkboxLabel, { color: colors.foreground }]}>
+              Boleta Realizada
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => togglePaymentField("isPaid")}
+            style={[styles.checkboxRow, { borderColor: colors.border }]}
+          >
+            <View
+              style={[
+                styles.checkbox,
+                {
+                  backgroundColor: form.isPaid ? colors.primary : colors.surface,
+                  borderColor: colors.primary,
+                },
+              ]}
+            >
+              {form.isPaid && (
+                <Text style={{ color: "white", fontSize: 14, fontWeight: "700" }}>✓</Text>
+              )}
+            </View>
+            <Text style={[styles.checkboxLabel, { color: colors.foreground }]}>
+              Pagado
+            </Text>
+          </TouchableOpacity>
+        </View>
+
         {/* Buttons */}
         <View style={styles.buttonRow}>
           <TouchableOpacity
@@ -460,5 +515,28 @@ const styles = StyleSheet.create({
     color: "white",
     fontSize: 15,
     fontWeight: "700",
+  },
+  checkboxRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginBottom: 8,
+    gap: 12,
+  },
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 6,
+    borderWidth: 2,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  checkboxLabel: {
+    fontSize: 15,
+    fontWeight: "500",
+    flex: 1,
   },
 });

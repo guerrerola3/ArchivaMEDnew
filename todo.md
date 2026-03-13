@@ -85,3 +85,9 @@
 ## Bugs
 - [x] Logo antiguo sigue apareciendo en launch - necesita reinicio del servidor y limpieza de caché
 - [x] Nombre "TraumaLog" sigue apareciendo en la página principal - necesita actualización de la pantalla
+
+## Nuevas Funcionalidades
+- [ ] Agregar campo de estado "boleta realizada" en procedimientos
+- [ ] Agregar campo de estado "pagado" en procedimientos
+- [ ] Agregar indicadores visuales en la lista de procedimientos
+- [ ] Agregar opciones para marcar como pagado/boleta desde la lista

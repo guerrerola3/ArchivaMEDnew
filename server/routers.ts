@@ -20,6 +20,8 @@ const procedureSchema = z.object({
   clinic: z.string().min(1),
   photoUrl: z.string().optional().nullable(),
   notes: z.string().optional().nullable(),
+  invoiceIssued: z.boolean().optional(),
+  isPaid: z.boolean().optional(),
 });
 
 export const appRouter = router({
@@ -86,16 +88,39 @@ export const appRouter = router({
       .input(z.object({ id: z.number() }).merge(procedureSchema.partial()))
       .mutation(({ ctx, input }) => {
         const { id, ...data } = input;
-        return db.updateProcedure(id, ctx.user.id, {
+        const updateData: any = {
           ...data,
           date: data.date ? new Date(data.date) : undefined,
-        });
+        };
+        // Convert boolean to number for database compatibility
+        if (data.invoiceIssued !== undefined) {
+          updateData.invoiceIssued = data.invoiceIssued ? 1 : 0;
+        }
+        if (data.isPaid !== undefined) {
+          updateData.isPaid = data.isPaid ? 1 : 0;
+        }
+        return db.updateProcedure(id, ctx.user.id, updateData);
       }),
 
     delete: protectedProcedure
       .input(z.object({ id: z.number() }))
       .mutation(({ ctx, input }) => {
         return db.deleteProcedure(input.id, ctx.user.id);
+      }),
+
+    updatePaymentStatus: protectedProcedure
+      .input(z.object({
+        id: z.number(),
+        invoiceIssued: z.boolean().optional(),
+        isPaid: z.boolean().optional(),
+      }))
+      .mutation(({ ctx, input }) => {
+        return db.updateProcedurePaymentStatus(
+          input.id,
+          ctx.user.id,
+          input.invoiceIssued,
+          input.isPaid
+        );
       }),
 
     extractFromPhoto: publicProcedure

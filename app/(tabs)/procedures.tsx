@@ -27,10 +27,14 @@ function ProcedureListItem({
   item,
   onPress,
   onDelete,
+  onToggleInvoice,
+  onTogglePaid,
 }: {
   item: LocalProcedure;
   onPress: () => void;
   onDelete: () => void;
+  onToggleInvoice?: (invoiced: boolean) => void;
+  onTogglePaid?: (paid: boolean) => void;
 }) {
   const colors = useColors();
   const date = new Date(item.date);
@@ -82,6 +86,18 @@ function ProcedureListItem({
               {scheduleLabel}
             </Text>
           </View>
+          <TouchableOpacity
+            onPress={() => onToggleInvoice?.(!item.invoiceIssued)}
+            style={[styles.paymentBadge, { backgroundColor: item.invoiceIssued ? colors.primary + "15" : colors.border + "40" }]}
+          >
+            <Text style={[styles.paymentBadgeText, { color: item.invoiceIssued ? colors.primary : colors.muted }]}>📄</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => onTogglePaid?.(!item.isPaid)}
+            style={[styles.paymentBadge, { backgroundColor: item.isPaid ? colors.success + "15" : colors.border + "40" }]}
+          >
+            <Text style={[styles.paymentBadgeText, { color: item.isPaid ? colors.success : colors.muted }]}>✓</Text>
+          </TouchableOpacity>
           {item.clinic ? (
             <Text style={[styles.clinicText, { color: colors.muted }]} numberOfLines={1}>
               {item.clinic}
@@ -97,7 +113,7 @@ function ProcedureListItem({
 export default function ProceduresScreen() {
   const router = useRouter();
   const colors = useColors();
-  const { procedures, isLoading, deleteProcedure } = useProcedures();
+  const { procedures, isLoading, deleteProcedure, updateProcedure } = useProcedures();
   const [filter, setFilter] = useState<FilterType>("all");
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -252,6 +268,8 @@ export default function ProceduresScreen() {
               item={item}
               onPress={() => (router as any).push(`/procedure/${item.localId}`)}
               onDelete={() => deleteProcedure(item.localId)}
+              onToggleInvoice={(invoiced) => updateProcedure(item.localId, { invoiceIssued: invoiced })}
+              onTogglePaid={(paid) => updateProcedure(item.localId, { isPaid: paid })}
             />
           )}
           stickySectionHeadersEnabled={true}
@@ -439,5 +457,14 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 8,
+  },
+  paymentBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+    borderRadius: 4,
+  },
+  paymentBadgeText: {
+    fontSize: 11,
+    fontWeight: "600",
   },
 });

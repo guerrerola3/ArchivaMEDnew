@@ -1,4 +1,4 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
+import { int, mysqlEnum, mysqlTable, text, timestamp, tinyint, varchar } from "drizzle-orm/mysql-core";
 
 /**
  * Core user table backing auth flow.
@@ -58,6 +58,10 @@ export const procedures = mysqlTable("procedures", {
 
   // Notas adicionales
   notes: text("notes"),
+
+  // Estado de pago y facturación
+  invoiceIssued: tinyint("invoiceIssued").notNull().default(0),
+  isPaid: tinyint("isPaid").notNull().default(0),
 
   // Metadatos
   createdAt: timestamp("createdAt").defaultNow().notNull(),

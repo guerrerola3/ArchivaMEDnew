@@ -202,3 +202,22 @@ export async function getProceduresByPeriod(
     )
     .orderBy(desc(procedures.date));
 }
+
+export async function updateProcedurePaymentStatus(
+  id: number,
+  userId: number,
+  invoiceIssued?: boolean,
+  isPaid?: boolean
+): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const updateData: Record<string, unknown> = { updatedAt: new Date() };
+  if (invoiceIssued !== undefined) updateData.invoiceIssued = invoiceIssued ? 1 : 0;
+  if (isPaid !== undefined) updateData.isPaid = isPaid ? 1 : 0;
+
+  await db
+    .update(procedures)
+    .set(updateData)
+    .where(and(eq(procedures.id, id), eq(procedures.userId, userId)));
+}

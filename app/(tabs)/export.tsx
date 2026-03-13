@@ -76,6 +76,8 @@ function buildExcelData(procedures: LocalProcedure[]) {
     "Horario",
     "Clínica",
     "Notas",
+    "Boleta Realizada",
+    "Pagado",
   ];
 
   const rows = procedures.map((p) => [
@@ -91,6 +93,8 @@ function buildExcelData(procedures: LocalProcedure[]) {
     SCHEDULE_TYPE_LABELS[p.schedule],
     p.clinic,
     p.notes ?? "",
+    p.invoiceIssued ? "Sí" : "No",
+    p.isPaid ? "Sí" : "No",
   ]);
 
   return [headers, ...rows];
@@ -119,6 +123,8 @@ function buildPdfHtml(procedures: LocalProcedure[], periodLabel: string): string
       <td>${SCHEDULE_TYPE_LABELS[p.schedule]}</td>
       <td>${p.clinic}</td>
       <td>${p.notes ?? ""}</td>
+      <td>${p.invoiceIssued ? "Sí" : "No"}</td>
+      <td>${p.isPaid ? "Sí" : "No"}</td>
     </tr>
   `
     )
@@ -161,6 +167,8 @@ function buildPdfHtml(procedures: LocalProcedure[], periodLabel: string): string
         <th>Horario</th>
         <th>Clínica</th>
         <th>Notas</th>
+        <th>Boleta</th>
+        <th>Pagado</th>
       </tr>
     </thead>
     <tbody>

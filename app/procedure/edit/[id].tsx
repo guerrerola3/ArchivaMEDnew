@@ -42,6 +42,8 @@ export default function EditProcedureScreen() {
     clinic: procedure.clinic,
     notes: procedure.notes ?? "",
     photoUrl: procedure.photoUrl,
+    invoiceIssued: procedure.invoiceIssued ?? false,
+    isPaid: procedure.isPaid ?? false,
   };
 
   const handleSubmit = async (data: ProcedureFormData) => {
@@ -54,6 +56,8 @@ export default function EditProcedureScreen() {
         procedureName: data.procedureName || null,
         procedureCode: data.procedureCode || null,
         notes: data.notes || null,
+        invoiceIssued: data.invoiceIssued,
+        isPaid: data.isPaid,
       });
       // Redirect to home screen after updating
       router.replace("/(tabs)");

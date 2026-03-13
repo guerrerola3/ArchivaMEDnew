@@ -22,6 +22,8 @@ export interface LocalProcedure {
   clinic: string;
   photoUrl?: string | null;
   notes?: string | null;
+  invoiceIssued?: boolean;
+  isPaid?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -127,6 +129,8 @@ export function ProceduresProvider({ children }: { children: React.ReactNode }) 
         clinic: sp.clinic,
         photoUrl: sp.photoUrl,
         notes: sp.notes,
+        invoiceIssued: sp.invoiceIssued === 1 || sp.invoiceIssued === true,
+        isPaid: sp.isPaid === 1 || sp.isPaid === true,
         createdAt: sp.createdAt instanceof Date ? sp.createdAt.toISOString() : sp.createdAt,
         updatedAt: sp.updatedAt instanceof Date ? sp.updatedAt.toISOString() : sp.updatedAt,
       }));
@@ -177,6 +181,8 @@ export function ProceduresProvider({ children }: { children: React.ReactNode }) 
             clinic: data.clinic,
             photoUrl: data.photoUrl,
             notes: data.notes,
+            invoiceIssued: data.invoiceIssued,
+            isPaid: data.isPaid,
           });
 
           const synced = updated.map((p) =>
