@@ -295,7 +295,7 @@ export default function CaptureScreen() {
             ) : (
               <>
                 <IconSymbol name="sparkles" size={18} color="white" />
-                <Text style={styles.buttonText}>Extraer datos con OCR</Text>
+                <Text style={styles.buttonText}>Extraer datos</Text>
               </>
             )}
           </TouchableOpacity>

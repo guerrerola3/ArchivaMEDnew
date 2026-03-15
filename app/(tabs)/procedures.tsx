@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import {
   Alert,
   FlatList,
+  Image,
   SectionList,
   StyleSheet,
   Text,
@@ -12,6 +13,7 @@ import {
 } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { PhotoDetailModal } from "@/components/photo-detail-modal";
 import { useColors } from "@/hooks/use-colors";
 import {
   LocalProcedure,
@@ -30,12 +32,14 @@ function ProcedureListItem({
   onDelete,
   onToggleInvoice,
   onTogglePaid,
+  onPhotoPress,
 }: {
   item: LocalProcedure;
   onPress: () => void;
   onDelete: () => void;
   onToggleInvoice?: (invoiced: boolean) => void;
   onTogglePaid?: (paid: boolean) => void;
+  onPhotoPress?: (photoUrl: string) => void;
 }) {
   const colors = useColors();
   const date = new Date(item.date);
@@ -53,34 +57,46 @@ function ProcedureListItem({
     <TouchableOpacity
       onPress={onPress}
       onLongPress={() => {
+        const options: any[] = [
+          {
+            text: item.invoiceIssued ? "✓ Boleta realizada" : "○ Marcar boleta",
+            onPress: () => onToggleInvoice?.(!item.invoiceIssued),
+          },
+          {
+            text: item.isPaid ? "✓ Pagado" : "○ Marcar pagado",
+            onPress: () => onTogglePaid?.(!item.isPaid),
+          },
+        ];
+        
+        if (item.photoUrl) {
+          options.push({
+            text: "📷 Ver protocolo",
+            onPress: () => onPhotoPress?.(item.photoUrl!),
+          });
+        }
+        
+        options.push(
+          {
+            text: "Eliminar",
+            style: "destructive",
+            onPress: () => {
+              Alert.alert(
+                "Eliminar procedimiento",
+                `¿Eliminar el procedimiento de ${item.patientName}?`,
+                [
+                  { text: "Cancelar", style: "cancel" },
+                  { text: "Eliminar", style: "destructive", onPress: onDelete },
+                ]
+              );
+            },
+          },
+          { text: "Cancelar", style: "cancel" }
+        );
+        
         Alert.alert(
           item.patientName,
           "Opciones de procedimiento",
-          [
-            {
-              text: item.invoiceIssued ? "✓ Boleta realizada" : "○ Marcar boleta",
-              onPress: () => onToggleInvoice?.(!item.invoiceIssued),
-            },
-            {
-              text: item.isPaid ? "✓ Pagado" : "○ Marcar pagado",
-              onPress: () => onTogglePaid?.(!item.isPaid),
-            },
-            {
-              text: "Eliminar",
-              style: "destructive",
-              onPress: () => {
-                Alert.alert(
-                  "Eliminar procedimiento",
-                  `¿Eliminar el procedimiento de ${item.patientName}?`,
-                  [
-                    { text: "Cancelar", style: "cancel" },
-                    { text: "Eliminar", style: "destructive", onPress: onDelete },
-                  ]
-                );
-              },
-            },
-            { text: "Cancelar", style: "cancel" },
-          ]
+          options
         );
       }}
       style={[styles.listItem, { backgroundColor: colors.surface, borderColor: colors.border }]}
@@ -137,6 +153,7 @@ export default function ProceduresScreen() {
   const [filter, setFilter] = useState<FilterType>("all");
   const [paymentFilter, setPaymentFilter] = useState<PaymentFilterType>("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedPhotoUrl, setSelectedPhotoUrl] = useState<string | null>(null);
 
   const filteredProcedures = useMemo(() => {
     let result = procedures;
@@ -344,6 +361,7 @@ export default function ProceduresScreen() {
               onDelete={() => deleteProcedure(item.localId)}
               onToggleInvoice={(invoiced) => updateProcedure(item.localId, { invoiceIssued: invoiced })}
               onTogglePaid={(paid) => updateProcedure(item.localId, { isPaid: paid })}
+              onPhotoPress={(photoUrl) => setSelectedPhotoUrl(photoUrl)}
             />
           )}
           stickySectionHeadersEnabled={true}
@@ -358,6 +376,13 @@ export default function ProceduresScreen() {
       >
         <IconSymbol name="camera.fill" size={24} color="white" />
       </TouchableOpacity>
+
+      {/* Photo Detail Modal */}
+      <PhotoDetailModal
+        visible={!!selectedPhotoUrl}
+        photoUrl={selectedPhotoUrl}
+        onClose={() => setSelectedPhotoUrl(null)}
+      />
     </ScreenContainer>
   );
 }

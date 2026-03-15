@@ -76,9 +76,11 @@ const styles = StyleSheet.create({
     marginTop: 60,
     marginBottom: 20,
     paddingHorizontal: 16,
+    width: "100%",
   },
   image: {
     width: "100%",
     height: "100%",
+    aspectRatio: 1,
   },
 });
