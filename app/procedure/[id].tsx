@@ -1,7 +1,9 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { useState } from "react";
 import { Alert, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { PhotoDetailModal } from "@/components/photo-detail-modal";
 import { useColors } from "@/hooks/use-colors";
 import {
   MONTHS_ES,
@@ -29,6 +31,7 @@ export default function ProcedureDetailScreen() {
   const router = useRouter();
   const colors = useColors();
   const { procedures, deleteProcedure } = useProcedures();
+  const [photoModalVisible, setPhotoModalVisible] = useState(false);
 
   const procedure = procedures.find((p) => p.localId === id);
 
@@ -149,14 +152,23 @@ export default function ProcedureDetailScreen() {
         {procedure.photoUrl && (
           <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <Text style={[styles.cardTitle, { color: colors.primary }]}>Protocolo / Ficha</Text>
-            <Image
-              source={{ uri: procedure.photoUrl }}
-              style={styles.photo}
-              resizeMode="contain"
-            />
+            <TouchableOpacity onPress={() => setPhotoModalVisible(true)}>
+              <Image
+                source={{ uri: procedure.photoUrl }}
+                style={styles.photo}
+                resizeMode="contain"
+              />
+            </TouchableOpacity>
           </View>
         )}
       </ScrollView>
+
+      {/* Photo Detail Modal */}
+      <PhotoDetailModal
+        visible={photoModalVisible}
+        photoUrl={procedure.photoUrl}
+        onClose={() => setPhotoModalVisible(false)}
+      />
     </ScreenContainer>
   );
 }
