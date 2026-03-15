@@ -1,15 +1,23 @@
 import { Tabs } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Platform } from "react-native";
+import { Platform, Text, View } from "react-native";
 import { useColors } from "@/hooks/use-colors";
 import { HapticTab } from "@/components/haptic-tab";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { useProcedures } from "@/lib/procedures-context";
+import { useMemo } from "react";
 
 export default function TabLayout() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const bottomPadding = Platform.OS === "web" ? 12 : Math.max(insets.bottom, 8);
   const tabBarHeight = 56 + bottomPadding;
+  const { procedures } = useProcedures();
+
+  // Count unpaid procedures
+  const unpaidCount = useMemo(() => {
+    return procedures.filter((p) => !p.isPaid).length;
+  }, [procedures]);
 
   return (
     <Tabs
@@ -42,7 +50,36 @@ export default function TabLayout() {
         name="procedures"
         options={{
           title: "Procedimientos",
-          tabBarIcon: ({ color }) => <IconSymbol size={26} name="list.bullet.clipboard.fill" color={color} />,
+          tabBarIcon: ({ color }) => (
+            <View>
+              <IconSymbol size={26} name="list.bullet.clipboard.fill" color={color} />
+              {unpaidCount > 0 && (
+                <View
+                  style={{
+                    position: "absolute",
+                    top: -4,
+                    right: -4,
+                    backgroundColor: colors.error,
+                    borderRadius: 10,
+                    width: 20,
+                    height: 20,
+                    justifyContent: "center",
+                    alignItems: "center",
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: "white",
+                      fontSize: 10,
+                      fontWeight: "700",
+                    }}
+                  >
+                    {unpaidCount > 9 ? "9+" : unpaidCount}
+                  </Text>
+                </View>
+              )}
+            </View>
+          ),
         }}
       />
       <Tabs.Screen

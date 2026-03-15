@@ -22,6 +22,7 @@ import {
 } from "@/lib/procedures-context";
 
 type FilterType = "all" | "cirugia" | "procedimiento" | "interconsulta";
+type PaymentFilterType = "all" | "paid" | "unpaid" | "invoiced" | "not_invoiced";
 
 function ProcedureListItem({
   item,
@@ -134,12 +135,30 @@ export default function ProceduresScreen() {
   const colors = useColors();
   const { procedures, isLoading, deleteProcedure, updateProcedure } = useProcedures();
   const [filter, setFilter] = useState<FilterType>("all");
+  const [paymentFilter, setPaymentFilter] = useState<PaymentFilterType>("all");
   const [searchQuery, setSearchQuery] = useState("");
 
   const filteredProcedures = useMemo(() => {
     let result = procedures;
     if (filter !== "all") {
       result = result.filter((p) => p.type === filter);
+    }
+    // Apply payment filter
+    if (paymentFilter !== "all") {
+      switch (paymentFilter) {
+        case "paid":
+          result = result.filter((p) => p.isPaid);
+          break;
+        case "unpaid":
+          result = result.filter((p) => !p.isPaid);
+          break;
+        case "invoiced":
+          result = result.filter((p) => p.invoiceIssued);
+          break;
+        case "not_invoiced":
+          result = result.filter((p) => !p.invoiceIssued);
+          break;
+      }
     }
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
@@ -154,7 +173,7 @@ export default function ProceduresScreen() {
       );
     }
     return result;
-  }, [procedures, filter, searchQuery]);
+  }, [procedures, filter, paymentFilter, searchQuery]);
 
   // Group by month
   const sections = useMemo(() => {
@@ -182,11 +201,24 @@ export default function ProceduresScreen() {
       });
   }, [filteredProcedures]);
 
+  // Count unpaid procedures
+  const unpaidCount = useMemo(() => {
+    return procedures.filter((p) => !p.isPaid).length;
+  }, [procedures]);
+
   const filterButtons: { key: FilterType; label: string }[] = [
     { key: "all", label: "Todos" },
     { key: "cirugia", label: "Cirugías" },
     { key: "procedimiento", label: "Procedim." },
     { key: "interconsulta", label: "Interconsult." },
+  ];
+
+  const paymentFilterButtons: { key: PaymentFilterType; label: string }[] = [
+    { key: "all", label: "Todos" },
+    { key: "paid", label: "Pagados" },
+    { key: "unpaid", label: "Pendientes" },
+    { key: "invoiced", label: "Con boleta" },
+    { key: "not_invoiced", label: "Sin boleta" },
   ];
 
   return (
@@ -238,6 +270,29 @@ export default function ProceduresScreen() {
               style={[
                 styles.filterButtonText,
                 { color: filter === btn.key ? colors.primary : colors.muted },
+              ]}
+            >
+              {btn.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {/* Payment Filter Tabs */}
+      <View style={[styles.filterContainer, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+        {paymentFilterButtons.map((btn) => (
+          <TouchableOpacity
+            key={btn.key}
+            onPress={() => setPaymentFilter(btn.key)}
+            style={[
+              styles.filterButton,
+              paymentFilter === btn.key && { borderBottomColor: colors.success, borderBottomWidth: 2 },
+            ]}
+          >
+            <Text
+              style={[
+                styles.filterButtonText,
+                { color: paymentFilter === btn.key ? colors.success : colors.muted },
               ]}
             >
               {btn.label}
