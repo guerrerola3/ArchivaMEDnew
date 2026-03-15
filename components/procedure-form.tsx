@@ -1,6 +1,7 @@
 import { useState } from "react";
 import {
   Alert,
+  Image,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -12,6 +13,7 @@ import {
 } from "react-native";
 import { useColors } from "@/hooks/use-colors";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { PhotoDetailModal } from "@/components/photo-detail-modal";
 import { LocalProcedure, ProcedureType, ScheduleType } from "@/lib/procedures-context";
 
 export interface ProcedureFormData {
@@ -203,6 +205,7 @@ export function ProcedureForm({
   isLoading = false,
 }: ProcedureFormProps) {
   const colors = useColors();
+  const [photoModalVisible, setPhotoModalVisible] = useState(false);
 
   const [form, setForm] = useState<ProcedureFormData>({
     patientName: initialData?.patientName ?? "",
@@ -343,6 +346,26 @@ export function ProcedureForm({
           />
         </View>
 
+        {/* Section: Protocolo Photo */}
+        {form.photoUrl && (
+          <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Text style={[styles.sectionTitle, { color: colors.primary }]}>Protocolo</Text>
+            <TouchableOpacity
+              onPress={() => setPhotoModalVisible(true)}
+              style={[styles.photoContainer, { borderColor: colors.border }]}
+            >
+              <Image
+                source={{ uri: form.photoUrl }}
+                style={styles.photoThumbnail}
+              />
+              <View style={styles.photoOverlay}>
+                <IconSymbol name="magnifyingglass" size={24} color="white" />
+                <Text style={styles.photoText}>Ver en detalle</Text>
+              </View>
+            </TouchableOpacity>
+          </View>
+        )}
+
         {/* Section: Notas */}
         <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <Text style={[styles.sectionTitle, { color: colors.primary }]}>Notas adicionales</Text>
@@ -421,6 +444,13 @@ export function ProcedureForm({
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      {/* Photo Detail Modal */}
+      <PhotoDetailModal
+        visible={photoModalVisible}
+        photoUrl={form.photoUrl}
+        onClose={() => setPhotoModalVisible(false)}
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -538,5 +568,31 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "500",
     flex: 1,
+  },
+  photoContainer: {
+    borderRadius: 12,
+    borderWidth: 1,
+    overflow: "hidden",
+    height: 200,
+  },
+  photoThumbnail: {
+    width: "100%",
+    height: "100%",
+  },
+  photoOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0, 0, 0, 0.4)",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 8,
+  },
+  photoText: {
+    color: "white",
+    fontSize: 14,
+    fontWeight: "600",
   },
 });
