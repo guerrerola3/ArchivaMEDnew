@@ -51,6 +51,9 @@ const MAPPING = {
   "star.fill": "star",
   "bandage.fill": "healing",
   "waveform.path.ecg": "monitor-heart",
+  "rotate.right.fill": "rotate-right",
+  "arrow.triangle.2.circlepath": "flip-camera-android",
+  "sparkles": "auto-awesome",
 } as IconMapping;
 
 /**

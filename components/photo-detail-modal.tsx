@@ -1,4 +1,4 @@
-import { Modal, StyleSheet, TouchableOpacity, View, Image, Text, Animated, PanResponder, GestureResponderEvent } from "react-native";
+import { Modal, StyleSheet, TouchableOpacity, View, Text, Animated, PanResponder } from "react-native";
 import { useState, useRef } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/use-colors";
@@ -15,12 +15,16 @@ export function PhotoDetailModal({ visible, photoUrl, onClose }: PhotoDetailModa
   const insets = useSafeAreaInsets();
   const [rotation, setRotation] = useState(0);
   const [scale] = useState(new Animated.Value(1));
-  const [lastScale, setLastScale] = useState(1);
   const [offsetX] = useState(new Animated.Value(0));
   const [offsetY] = useState(new Animated.Value(0));
-  const pinchStartDistance = useRef(0);
-  const lastOffsetX = useRef(0);
-  const lastOffsetY = useRef(0);
+
+  const scaleRef = useRef(1);
+  const offsetXRef = useRef(0);
+  const offsetYRef = useRef(0);
+  const pinchStartDistanceRef = useRef(0);
+  const pinchStartScaleRef = useRef(1);
+  const lastPanXRef = useRef(0);
+  const lastPanYRef = useRef(0);
 
   if (!photoUrl) return null;
 
@@ -28,96 +32,90 @@ export function PhotoDetailModal({ visible, photoUrl, onClose }: PhotoDetailModa
     setRotation((prev) => (prev + 90) % 360);
   };
 
-  const handlePinchStart = (event: any) => {
-    const { touches } = event.nativeEvent;
-    if (touches.length === 2) {
-      const dx = touches[0].pageX - touches[1].pageX;
-      const dy = touches[0].pageY - touches[1].pageY;
-      pinchStartDistance.current = Math.sqrt(dx * dx + dy * dy);
-    }
-  };
-
-  const handlePinchMove = (event: any) => {
-    const { touches } = event.nativeEvent;
-    if (touches.length === 2) {
-      const dx = touches[0].pageX - touches[1].pageX;
-      const dy = touches[0].pageY - touches[1].pageY;
-      const distance = Math.sqrt(dx * dx + dy * dy);
-      const scaleValue = (distance / pinchStartDistance.current) * lastScale;
-      const clampedScale = Math.max(1, Math.min(scaleValue, 4));
-      scale.setValue(clampedScale);
-      setLastScale(clampedScale);
-    } else if (touches.length === 1 && lastScale > 1) {
-      // Single finger pan when zoomed
-      const dx = touches[0].pageX - (touches[0].pageX - lastOffsetX.current);
-      const dy = touches[0].pageY - (touches[0].pageY - lastOffsetY.current);
-      offsetX.setValue(dx);
-      offsetY.setValue(dy);
-    }
-  };
-
-  const handlePanStart = (event: any, gestureState: any) => {
-    if (lastScale <= 1) return;
-    lastOffsetX.current = gestureState.dx;
-    lastOffsetY.current = gestureState.dy;
-  };
-
-  const handlePanMove = (event: any, gestureState: any) => {
-    if (lastScale <= 1) return;
-    offsetX.setValue(gestureState.dx);
-    offsetY.setValue(gestureState.dy);
-  };
-
-  const handlePanEnd = (event: any, gestureState: any) => {
-    if (lastScale <= 1) return;
-    lastOffsetX.current = gestureState.dx;
-    lastOffsetY.current = gestureState.dy;
-  };
-
   const panResponder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => lastScale > 1,
-      onMoveShouldSetPanResponder: () => lastScale > 1,
-      onPanResponderGrant: handlePanStart,
-      onPanResponderMove: handlePanMove,
-      onPanResponderRelease: handlePanEnd,
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: (event) => {
+        const touches = event.nativeEvent.touches;
+        if (touches.length === 2) {
+          const dx = touches[0].pageX - touches[1].pageX;
+          const dy = touches[0].pageY - touches[1].pageY;
+          pinchStartDistanceRef.current = Math.sqrt(dx * dx + dy * dy);
+          pinchStartScaleRef.current = scaleRef.current;
+        }
+      },
+      onPanResponderMove: (event) => {
+        const touches = event.nativeEvent.touches;
+
+        if (touches.length === 2) {
+          // Pinch zoom
+          const dx = touches[0].pageX - touches[1].pageX;
+          const dy = touches[0].pageY - touches[1].pageY;
+          const distance = Math.sqrt(dx * dx + dy * dy);
+          const newScale = Math.max(1, Math.min((distance / pinchStartDistanceRef.current) * pinchStartScaleRef.current, 4));
+
+          scaleRef.current = newScale;
+          scale.setValue(newScale);
+        } else if (touches.length === 1 && scaleRef.current > 1) {
+          // Pan when zoomed - single finger drag
+          const currentX = touches[0].pageX;
+          const currentY = touches[0].pageY;
+
+          const deltaX = currentX - lastPanXRef.current;
+          const deltaY = currentY - lastPanYRef.current;
+
+          offsetXRef.current += deltaX;
+          offsetYRef.current += deltaY;
+
+          offsetX.setValue(offsetXRef.current);
+          offsetY.setValue(offsetYRef.current);
+
+          lastPanXRef.current = currentX;
+          lastPanYRef.current = currentY;
+        }
+      },
+      onPanResponderRelease: () => {
+        if (scaleRef.current < 1) {
+          Animated.spring(scale, {
+            toValue: 1,
+            useNativeDriver: false,
+          }).start();
+          scaleRef.current = 1;
+        }
+      },
     })
   ).current;
 
   return (
-    <Modal
-      visible={visible}
-      transparent={true}
-      animationType="fade"
-      onRequestClose={onClose}
-    >
+    <Modal visible={visible} transparent={true} animationType="fade" onRequestClose={onClose}>
       <View style={styles.container}>
-        {/* Header with SafeArea */}
+        {/* Header */}
         <View style={[styles.header, { backgroundColor: colors.primary, paddingTop: Math.max(insets.top, 12) }]}>
           <Text style={styles.headerTitle}>Protocolo</Text>
-          <TouchableOpacity onPress={onClose} style={styles.closeButton} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+          <TouchableOpacity
+            onPress={onClose}
+            style={styles.closeButton}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
             <IconSymbol name="xmark.circle.fill" size={28} color="white" />
           </TouchableOpacity>
         </View>
 
         {/* Controls */}
         <View style={[styles.controls, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
-          <TouchableOpacity onPress={handleRotate} style={[styles.controlButton, { backgroundColor: colors.primary + "20" }]}>
+          <TouchableOpacity
+            onPress={handleRotate}
+            style={[styles.controlButton, { backgroundColor: colors.primary + "20" }]}
+          >
             <IconSymbol name="rotate.right.fill" size={20} color={colors.primary} />
             <Text style={[styles.controlText, { color: colors.primary }]}>Rotar</Text>
           </TouchableOpacity>
-          <Text style={[styles.zoomHint, { color: colors.muted }]}>Pinch para zoom, arrastra para mover</Text>
+          <Text style={[styles.zoomHint, { color: colors.muted }]}>Pinch para zoom</Text>
         </View>
 
-        {/* Image Container with Zoom and Pan */}
-        <View
-          style={styles.imageContainer}
-          {...panResponder.panHandlers}
-          onStartShouldSetResponder={() => true}
-          onMoveShouldSetResponder={() => lastScale > 1}
-          onResponderMove={handlePinchMove}
-          onResponderGrant={handlePinchStart}
-        >
+        {/* Image Container */}
+        <View style={styles.imageContainer} {...panResponder.panHandlers}>
           <Animated.Image
             source={{ uri: photoUrl }}
             style={[
@@ -192,7 +190,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   image: {
-    width: 300,
-    height: 400,
+    width: "100%",
+    height: "100%",
   },
 });
