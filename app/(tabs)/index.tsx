@@ -123,24 +123,6 @@ export default function HomeScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        {/* Header */}
-        <View style={[styles.header, { backgroundColor: colors.primary }]}>
-          <View>
-            <Text style={styles.headerGreeting}>
-              {isAuthenticated ? `Hola, Dr. ${user?.name?.split(" ")[0] ?? ""}` : "ArchivaMED"}
-            </Text>
-            <Text style={styles.headerSubtitle}>
-              {MONTHS_ES[currentMonth - 1]} {currentYear}
-            </Text>
-          </View>
-          <TouchableOpacity
-            onPress={() => refreshFromServer()}
-            style={styles.refreshButton}
-          >
-            <IconSymbol name="arrow.clockwise" size={20} color="white" />
-          </TouchableOpacity>
-        </View>
-
         {/* Banner */}
         <View style={styles.bannerContainer}>
           <Image
@@ -240,12 +222,12 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.2)",
   },
   bannerContainer: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: 0,
+    paddingVertical: 0,
   },
   banner: {
     width: "100%",
-    height: 120,
+    height: 160,
   },
   statsSection: {
     padding: 20,
