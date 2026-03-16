@@ -1,4 +1,4 @@
-import { Modal, StyleSheet, TouchableOpacity, View, Image, Text, ScrollView, Animated } from "react-native";
+import { Modal, StyleSheet, TouchableOpacity, View, Image, Text, Animated, PanResponder, GestureResponderEvent } from "react-native";
 import { useState, useRef } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/use-colors";
@@ -16,7 +16,11 @@ export function PhotoDetailModal({ visible, photoUrl, onClose }: PhotoDetailModa
   const [rotation, setRotation] = useState(0);
   const [scale] = useState(new Animated.Value(1));
   const [lastScale, setLastScale] = useState(1);
+  const [offsetX] = useState(new Animated.Value(0));
+  const [offsetY] = useState(new Animated.Value(0));
   const pinchStartDistance = useRef(0);
+  const lastOffsetX = useRef(0);
+  const lastOffsetY = useRef(0);
 
   if (!photoUrl) return null;
 
@@ -40,14 +44,45 @@ export function PhotoDetailModal({ visible, photoUrl, onClose }: PhotoDetailModa
       const dy = touches[0].pageY - touches[1].pageY;
       const distance = Math.sqrt(dx * dx + dy * dy);
       const scaleValue = (distance / pinchStartDistance.current) * lastScale;
-      const clampedScale = Math.max(1, Math.min(scaleValue, 3));
+      const clampedScale = Math.max(1, Math.min(scaleValue, 4));
       scale.setValue(clampedScale);
+      setLastScale(clampedScale);
+    } else if (touches.length === 1 && lastScale > 1) {
+      // Single finger pan when zoomed
+      const dx = touches[0].pageX - (touches[0].pageX - lastOffsetX.current);
+      const dy = touches[0].pageY - (touches[0].pageY - lastOffsetY.current);
+      offsetX.setValue(dx);
+      offsetY.setValue(dy);
     }
   };
 
-  const handlePinchEnd = () => {
-    setLastScale(Math.max(1, Math.min(lastScale, 3)));
+  const handlePanStart = (event: any, gestureState: any) => {
+    if (lastScale <= 1) return;
+    lastOffsetX.current = gestureState.dx;
+    lastOffsetY.current = gestureState.dy;
   };
+
+  const handlePanMove = (event: any, gestureState: any) => {
+    if (lastScale <= 1) return;
+    offsetX.setValue(gestureState.dx);
+    offsetY.setValue(gestureState.dy);
+  };
+
+  const handlePanEnd = (event: any, gestureState: any) => {
+    if (lastScale <= 1) return;
+    lastOffsetX.current = gestureState.dx;
+    lastOffsetY.current = gestureState.dy;
+  };
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => lastScale > 1,
+      onMoveShouldSetPanResponder: () => lastScale > 1,
+      onPanResponderGrant: handlePanStart,
+      onPanResponderMove: handlePanMove,
+      onPanResponderRelease: handlePanEnd,
+    })
+  ).current;
 
   return (
     <Modal
@@ -71,39 +106,34 @@ export function PhotoDetailModal({ visible, photoUrl, onClose }: PhotoDetailModa
             <IconSymbol name="rotate.right.fill" size={20} color={colors.primary} />
             <Text style={[styles.controlText, { color: colors.primary }]}>Rotar</Text>
           </TouchableOpacity>
-          <Text style={[styles.zoomHint, { color: colors.muted }]}>Pinch para zoom</Text>
+          <Text style={[styles.zoomHint, { color: colors.muted }]}>Pinch para zoom, arrastra para mover</Text>
         </View>
 
-        {/* Image Container with Zoom */}
-        <ScrollView
-          style={styles.scrollView}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-          scrollEnabled={lastScale > 1}
+        {/* Image Container with Zoom and Pan */}
+        <View
+          style={styles.imageContainer}
+          {...panResponder.panHandlers}
+          onStartShouldSetResponder={() => true}
+          onMoveShouldSetResponder={() => lastScale > 1}
+          onResponderMove={handlePinchMove}
+          onResponderGrant={handlePinchStart}
         >
-          <View
-            style={styles.imageWrapper}
-            onStartShouldSetResponder={() => true}
-            onMoveShouldSetResponder={() => lastScale > 1}
-            onResponderMove={handlePinchMove}
-            onResponderGrant={handlePinchStart}
-            onResponderRelease={handlePinchEnd}
-          >
-            <Animated.Image
-              source={{ uri: photoUrl }}
-              style={[
-                styles.image,
-                {
-                  transform: [
-                    { rotate: `${rotation}deg` },
-                    { scale: scale },
-                  ],
-                },
-              ]}
-              resizeMode="contain"
-            />
-          </View>
-        </ScrollView>
+          <Animated.Image
+            source={{ uri: photoUrl }}
+            style={[
+              styles.image,
+              {
+                transform: [
+                  { rotate: `${rotation}deg` },
+                  { scale: scale },
+                  { translateX: offsetX },
+                  { translateY: offsetY },
+                ],
+              },
+            ]}
+            resizeMode="contain"
+          />
+        </View>
       </View>
     </Modal>
   );
@@ -155,24 +185,14 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginLeft: "auto",
   },
-  scrollView: {
+  imageContainer: {
     flex: 1,
-  },
-  scrollContent: {
-    flexGrow: 1,
     justifyContent: "center",
     alignItems: "center",
-    paddingHorizontal: 12,
-    paddingVertical: 16,
-  },
-  imageWrapper: {
-    width: "100%",
-    aspectRatio: 0.75,
-    justifyContent: "center",
-    alignItems: "center",
+    overflow: "hidden",
   },
   image: {
-    width: "100%",
-    height: "100%",
+    width: 300,
+    height: 400,
   },
 });

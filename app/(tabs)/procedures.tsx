@@ -233,8 +233,7 @@ export default function ProceduresScreen() {
   const paymentFilterButtons: { key: PaymentFilterType; label: string }[] = [
     { key: "all", label: "Todos" },
     { key: "paid", label: "Pagados" },
-    { key: "unpaid", label: "Pendientes" },
-    { key: "invoiced", label: "Con boleta" },
+    { key: "invoiced", label: "Boleta Hecha" },
     { key: "not_invoiced", label: "Sin boleta" },
   ];
 

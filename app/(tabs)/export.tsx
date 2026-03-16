@@ -533,7 +533,7 @@ export default function ExportScreen() {
             onPress={() => setIncludeNotes(!includeNotes)}
             style={[styles.optionRow, { borderColor: colors.border }]}
           >
-            <Text style={[styles.optionLabel, { color: colors.foreground }]}>Incluir notas</Text>
+            <Text style={[styles.optionLabel, { color: colors.foreground }]}>Notas (detalle de protocolos)</Text>
             <View
               style={[
                 styles.toggleSwitch,
