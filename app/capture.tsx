@@ -3,6 +3,7 @@ import * as ImageManipulator from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
 import { useRef, useState } from "react";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   ActivityIndicator,
   Alert,
@@ -47,6 +48,7 @@ export default function CaptureScreen() {
   const [uploadedPhotoUrl, setUploadedPhotoUrl] = useState<string | null>(null);
   const [processingError, setProcessingError] = useState<string | null>(null);
   const [facing, setFacing] = useState<"back" | "front">("back");
+  const insets = useSafeAreaInsets();
   const [compressionStats, setCompressionStats] = useState<{
     original: number;
     compressed: number;
@@ -220,12 +222,12 @@ export default function CaptureScreen() {
         <CameraView ref={cameraRef} style={styles.camera} facing={facing}>
           <View style={styles.cameraOverlay}>
             {/* Header */}
-            <View style={[styles.cameraHeader, { backgroundColor: "rgba(0,0,0,0.5)" }]}>
-              <TouchableOpacity onPress={() => router.back()}>
+            <View style={[styles.cameraHeader, { backgroundColor: "rgba(0,0,0,0.5)", paddingTop: Math.max(insets.top, 12) }]}>
+              <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                 <IconSymbol name="chevron.left" size={24} color="white" />
               </TouchableOpacity>
               <Text style={styles.cameraHeaderTitle}>Capturar protocolo</Text>
-              <TouchableOpacity onPress={() => setFacing(facing === "back" ? "front" : "back")}>
+              <TouchableOpacity onPress={() => setFacing(facing === "back" ? "front" : "back")} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                 <IconSymbol name="arrow.triangle.2.circlepath" size={24} color="white" />
               </TouchableOpacity>
             </View>
