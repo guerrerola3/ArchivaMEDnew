@@ -1,4 +1,4 @@
-import { Modal, StyleSheet, TouchableOpacity, View, Image, Text } from "react-native";
+import { Modal, StyleSheet, TouchableOpacity, View, Image, Text, ScrollView } from "react-native";
 import { useColors } from "@/hooks/use-colors";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 
@@ -20,7 +20,7 @@ export function PhotoDetailModal({ visible, photoUrl, onClose }: PhotoDetailModa
       animationType="fade"
       onRequestClose={onClose}
     >
-      <View style={[styles.container, { backgroundColor: colors.background + "E6" }]}>
+      <View style={styles.container}>
         {/* Header */}
         <View style={[styles.header, { backgroundColor: colors.primary }]}>
           <Text style={styles.headerTitle}>Protocolo</Text>
@@ -29,14 +29,20 @@ export function PhotoDetailModal({ visible, photoUrl, onClose }: PhotoDetailModa
           </TouchableOpacity>
         </View>
 
-        {/* Image */}
-        <View style={styles.imageContainer}>
-          <Image
-            source={{ uri: photoUrl }}
-            style={styles.image}
-            resizeMode="contain"
-          />
-        </View>
+        {/* Image Container */}
+        <ScrollView 
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.imageWrapper}>
+            <Image
+              source={{ uri: photoUrl }}
+              style={styles.image}
+              resizeMode="contain"
+            />
+          </View>
+        </ScrollView>
       </View>
     </Modal>
   );
@@ -45,17 +51,13 @@ export function PhotoDetailModal({ visible, photoUrl, onClose }: PhotoDetailModa
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.95)",
+    justifyContent: "flex-start",
   },
   header: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
     paddingHorizontal: 16,
-    paddingVertical: 14,
-    paddingTop: 20,
+    paddingVertical: 12,
+    paddingTop: 16,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
@@ -67,20 +69,26 @@ const styles = StyleSheet.create({
     color: "white",
   },
   closeButton: {
-    padding: 4,
+    padding: 8,
   },
-  imageContainer: {
+  scrollView: {
     flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
     justifyContent: "center",
     alignItems: "center",
-    marginTop: 60,
-    marginBottom: 20,
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 16,
+  },
+  imageWrapper: {
     width: "100%",
+    aspectRatio: 0.75,
+    justifyContent: "center",
+    alignItems: "center",
   },
   image: {
     width: "100%",
     height: "100%",
-    aspectRatio: 1,
   },
 });
