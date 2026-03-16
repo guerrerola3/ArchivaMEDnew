@@ -68,13 +68,6 @@ function ProcedureListItem({
           },
         ];
         
-        if (item.photoUrl) {
-          options.push({
-            text: "📷 Ver protocolo",
-            onPress: () => onPhotoPress?.(item.photoUrl!),
-          });
-        }
-        
         options.push(
           {
             text: "Eliminar",

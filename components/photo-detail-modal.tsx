@@ -111,7 +111,6 @@ export function PhotoDetailModal({ visible, photoUrl, onClose }: PhotoDetailModa
             <IconSymbol name="rotate.right.fill" size={20} color={colors.primary} />
             <Text style={[styles.controlText, { color: colors.primary }]}>Rotar</Text>
           </TouchableOpacity>
-          <Text style={[styles.zoomHint, { color: colors.muted }]}>Pinch para zoom</Text>
         </View>
 
         {/* Image Container */}
