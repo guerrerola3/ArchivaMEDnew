@@ -3,6 +3,7 @@ import { useRouter } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import {
   FlatList,
+  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -140,6 +141,15 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </View>
 
+        {/* Banner */}
+        <View style={styles.bannerContainer}>
+          <Image
+            source={require("@/assets/images/banner.png")}
+            style={styles.banner}
+            resizeMode="contain"
+          />
+        </View>
+
         {/* Stats */}
         <View style={styles.statsSection}>
           <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
@@ -228,6 +238,14 @@ const styles = StyleSheet.create({
     padding: 8,
     borderRadius: 20,
     backgroundColor: "rgba(255,255,255,0.2)",
+  },
+  bannerContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  banner: {
+    width: "100%",
+    height: 120,
   },
   statsSection: {
     padding: 20,
