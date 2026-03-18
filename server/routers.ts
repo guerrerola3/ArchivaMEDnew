@@ -19,7 +19,7 @@ const procedureSchema = z.object({
   type: z.enum(["cirugia", "procedimiento", "interconsulta"]),
   schedule: z.enum(["habil", "inhabil"]),
   clinic: z.string().min(1),
-  provision: z.enum(["fonasa", "cruz_blanca", "nueva_masvida", "consalud", "vida_tres", "colmena", "particular"]).optional().nullable(),
+  provision: z.string().optional().nullable(),
   photoUrl: z.string().optional().nullable(),
   notes: z.string().optional().nullable(),
   invoiceIssued: z.boolean().optional(),

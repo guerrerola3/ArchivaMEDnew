@@ -5,7 +5,7 @@ import { useAuth } from "@/hooks/use-auth";
 
 export type ProcedureType = "cirugia" | "procedimiento" | "interconsulta";
 export type ScheduleType = "habil" | "inhabil";
-export type ProvisionType = "fonasa" | "cruz_blanca" | "nueva_masvida" | "consalud" | "vida_tres" | "colmena" | "particular";
+// Provision es ahora un campo de texto libre (string)
 
 export interface LocalProcedure {
   localId: string;
@@ -21,7 +21,7 @@ export interface LocalProcedure {
   type: ProcedureType;
   schedule: ScheduleType;
   clinic: string;
-  provision?: ProvisionType | null;
+  provision?: string | null;
   photoUrl?: string | null;
   notes?: string | null;
   invoiceIssued?: boolean;

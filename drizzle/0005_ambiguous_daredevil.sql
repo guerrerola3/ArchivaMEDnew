@@ -1,0 +1,1 @@
+ALTER TABLE `procedures` MODIFY COLUMN `provision` varchar(255);
