@@ -25,6 +25,7 @@ export default function NewProcedureScreen() {
     type?: string;
     schedule?: string;
     clinic?: string;
+    provision?: string;
     notes?: string;
     photoUrl?: string;
   }>();
@@ -40,6 +41,7 @@ export default function NewProcedureScreen() {
     type: (params.type as any) ?? "cirugia",
     schedule: (params.schedule as any) ?? "habil",
     clinic: params.clinic ?? "",
+    provision: (params.provision as any) ?? null,
     notes: params.notes ?? "",
     photoUrl: params.photoUrl,
   };

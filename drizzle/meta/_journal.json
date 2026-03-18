@@ -29,6 +29,13 @@
       "when": 1773271702433,
       "tag": "0003_misty_fantastic_four",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "5",
+      "when": 1773802034587,
+      "tag": "0004_free_northstar",
+      "breakpoints": true
     }
   ]
 }

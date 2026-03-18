@@ -18,6 +18,7 @@ const procedureSchema = z.object({
   type: z.enum(["cirugia", "procedimiento", "interconsulta"]),
   schedule: z.enum(["habil", "inhabil"]),
   clinic: z.string().min(1),
+  provision: z.enum(["fonasa", "cruz_blanca", "nueva_masvida", "consalud", "vida_tres", "colmena", "particular"]).optional().nullable(),
   photoUrl: z.string().optional().nullable(),
   notes: z.string().optional().nullable(),
   invoiceIssued: z.boolean().optional(),
@@ -79,6 +80,7 @@ export const appRouter = router({
           type: input.type,
           schedule: input.schedule,
           clinic: input.clinic,
+          provision: input.provision ?? undefined,
           photoUrl: input.photoUrl ?? undefined,
           notes: input.notes ?? undefined,
         });

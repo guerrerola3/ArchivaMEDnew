@@ -1,0 +1,1 @@
+ALTER TABLE `procedures` ADD `provision` enum('fonasa','cruz_blanca','nueva_masvida','consalud','vida_tres','colmena','particular');

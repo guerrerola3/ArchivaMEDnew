@@ -14,7 +14,7 @@ import {
 import { useColors } from "@/hooks/use-colors";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { PhotoDetailModal } from "@/components/photo-detail-modal";
-import { LocalProcedure, ProcedureType, ScheduleType } from "@/lib/procedures-context";
+import { LocalProcedure, ProcedureType, ScheduleType, ProvisionType } from "@/lib/procedures-context";
 
 export interface ProcedureFormData {
   patientName: string;
@@ -27,6 +27,7 @@ export interface ProcedureFormData {
   type: ProcedureType;
   schedule: ScheduleType;
   clinic: string;
+  provision?: ProvisionType | null;
   notes: string;
   photoUrl?: string | null;
   invoiceIssued?: boolean;
@@ -218,6 +219,7 @@ export function ProcedureForm({
     type: initialData?.type ?? "cirugia",
     schedule: initialData?.schedule ?? "habil",
     clinic: initialData?.clinic ?? "",
+    provision: initialData?.provision ?? null,
     notes: initialData?.notes ?? "",
     photoUrl: initialData?.photoUrl,
     invoiceIssued: initialData?.invoiceIssued ?? false,
@@ -259,6 +261,16 @@ export function ProcedureForm({
     { key: "inhabil", label: "Inhábil" },
   ];
 
+  const provisionOptions: { key: ProvisionType; label: string }[] = [
+    { key: "fonasa", label: "FONASA" },
+    { key: "cruz_blanca", label: "Cruz Blanca" },
+    { key: "nueva_masvida", label: "Nueva Masvida" },
+    { key: "consalud", label: "Consalud" },
+    { key: "vida_tres", label: "Vida Tres" },
+    { key: "colmena", label: "Colmena" },
+    { key: "particular", label: "Particular" },
+  ];
+
   return (
     <KeyboardAvoidingView
       style={{ flex: 1 }}
@@ -295,6 +307,40 @@ export function ProcedureForm({
             onChangeText={(v) => update("clinic", v)}
             required
           />
+        </View>
+
+        {/* Section: Previsión */}
+        <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <Text style={[styles.sectionTitle, { color: colors.primary }]}>Previsión</Text>
+          <View style={styles.fieldContainer}>
+            <Text style={[styles.fieldLabel, { color: colors.muted }]}>Seguro de Salud</Text>
+            <View style={[styles.provisionPicker, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              {provisionOptions.map((opt, idx) => (
+                <TouchableOpacity
+                  key={opt.key}
+                  onPress={() => update("provision", opt.key)}
+                  style={[
+                    styles.provisionOption,
+                    { borderColor: colors.border },
+                    form.provision === opt.key && { backgroundColor: colors.primary + "20" },
+                    idx === provisionOptions.length - 1 && { borderBottomWidth: 0 },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.provisionOptionText,
+                      {
+                        color: form.provision === opt.key ? colors.primary : colors.foreground,
+                        fontWeight: form.provision === opt.key ? "600" : "400",
+                      },
+                    ]}
+                  >
+                    {opt.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
         </View>
 
         {/* Section: Paciente */}
@@ -594,5 +640,18 @@ const styles = StyleSheet.create({
     color: "white",
     fontSize: 14,
     fontWeight: "600",
+  },
+  provisionPicker: {
+    borderWidth: 1,
+    borderRadius: 10,
+    overflow: "hidden",
+  },
+  provisionOption: {
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderBottomWidth: 1,
+  },
+  provisionOptionText: {
+    fontSize: 14,
   },
 });

@@ -75,10 +75,21 @@ function buildExcelData(procedures: LocalProcedure[], includeNotes: boolean = tr
     "Tipo",
     "Horario",
     "Clínica",
+    "Previsión",
     ...(includeNotes ? ["Notas"] : []),
     "Boleta Realizada",
     "Pagado",
   ];
+
+  const PROVISION_LABELS: Record<string, string> = {
+    fonasa: "FONASA",
+    cruz_blanca: "Cruz Blanca",
+    nueva_masvida: "Nueva Masvida",
+    consalud: "Consalud",
+    vida_tres: "Vida Tres",
+    colmena: "Colmena",
+    particular: "Particular",
+  };
 
   const rows = procedures.map((p) => [
     formatDate(p.date),
@@ -92,6 +103,7 @@ function buildExcelData(procedures: LocalProcedure[], includeNotes: boolean = tr
     PROCEDURE_TYPE_LABELS[p.type],
     SCHEDULE_TYPE_LABELS[p.schedule],
     p.clinic,
+    p.provision ? PROVISION_LABELS[p.provision] : "",
     ...(includeNotes ? [p.notes ?? ""] : []),
     p.invoiceIssued ? "Sí" : "No",
     p.isPaid ? "Sí" : "No",
@@ -101,6 +113,16 @@ function buildExcelData(procedures: LocalProcedure[], includeNotes: boolean = tr
 }
 
 function buildPdfHtml(procedures: LocalProcedure[], periodLabel: string, includeNotes: boolean = true): string {
+  const PROVISION_LABELS: Record<string, string> = {
+    fonasa: "FONASA",
+    cruz_blanca: "Cruz Blanca",
+    nueva_masvida: "Nueva Masvida",
+    consalud: "Consalud",
+    vida_tres: "Vida Tres",
+    colmena: "Colmena",
+    particular: "Particular",
+  };
+
   const now = new Date().toLocaleDateString("es-CL", {
     day: "2-digit",
     month: "2-digit",
@@ -122,6 +144,7 @@ function buildPdfHtml(procedures: LocalProcedure[], periodLabel: string, include
       <td>${PROCEDURE_TYPE_LABELS[p.type]}</td>
       <td>${SCHEDULE_TYPE_LABELS[p.schedule]}</td>
       <td>${p.clinic}</td>
+      <td>${p.provision ? PROVISION_LABELS[p.provision] : ""}</td>
       ${includeNotes ? `<td>${p.notes ?? ""}</td>` : ""}
       <td>${p.invoiceIssued ? "Sí" : "No"}</td>
       <td>${p.isPaid ? "Sí" : "No"}</td>
@@ -166,6 +189,7 @@ function buildPdfHtml(procedures: LocalProcedure[], periodLabel: string, include
         <th>Tipo</th>
         <th>Horario</th>
         <th>Clínica</th>
+        <th>Previsión</th>
         ${includeNotes ? "<th>Notas</th>" : ""}
         <th>Boleta</th>
         <th>Pagado</th>

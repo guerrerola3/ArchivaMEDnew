@@ -32,6 +32,7 @@ interface ExtractedData {
   type?: string | null;
   schedule?: string | null;
   clinic?: string | null;
+  provision?: string | null;
   notes?: string | null;
 }
 
@@ -185,6 +186,9 @@ export default function CaptureScreen() {
           : "cirugia",
         schedule: ["habil", "inhabil"].includes(data.schedule ?? "") ? data.schedule : "habil",
         clinic: data.clinic ?? "",
+        provision: ["fonasa", "cruz_blanca", "nueva_masvida", "consalud", "vida_tres", "colmena", "particular"].includes(data.provision ?? "")
+          ? data.provision
+          : "",
         notes: data.notes ?? "",
       },
     });

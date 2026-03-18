@@ -53,6 +53,9 @@ export const procedures = mysqlTable("procedures", {
   // Lugar
   clinic: varchar("clinic", { length: 255 }).notNull(),
 
+  // Previsión (seguro de salud)
+  provision: mysqlEnum("provision", ["fonasa", "cruz_blanca", "nueva_masvida", "consalud", "vida_tres", "colmena", "particular"]),
+
   // Imagen del protocolo
   photoUrl: text("photoUrl"),
 
