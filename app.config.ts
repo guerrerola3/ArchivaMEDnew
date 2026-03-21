@@ -47,11 +47,6 @@ const config: ExpoConfig = {
   scheme: env.scheme,
   userInterfaceStyle: "automatic",
   newArchEnabled: true,
-  extra: {
-    eas: {
-      projectId: "8b6dcea7-702e-4e12-857e-b14b799e80a7"
-    }
-  }
   ios: {
     supportsTablet: true,
     bundleIdentifier: env.iosBundleId,
@@ -147,5 +142,13 @@ const config: ExpoConfig = {
     reactCompiler: true,
   },
 };
-
+{
+  "expo"; {
+    "extra"; {
+      "eas"; {
+        "projectId"; "8b6dcea7-702e-4e12-857e-b14b799e80a7"
+      }
+    }
+  }
+}
 export default config;
