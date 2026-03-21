@@ -56,7 +56,10 @@ const config: ExpoConfig = {
     supportsTablet: true,
     bundleIdentifier: env.iosBundleId,
     "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        NSCameraUsageDescription: "Esta app necesita acceso a la cámara para escanear texto médico.",
+        NSPhotoLibraryUsageDescription: "Esta app necesita acceder a tus fotos para analizar imágenes.",
+        NSPhotoLibraryAddUsageDescription: "Permite guardar imágenes procesadas."
       }
   },
   android: {
