@@ -303,6 +303,40 @@ export default function CaptureScreen() {
           </TouchableOpacity>
 
           <TouchableOpacity
+          onPress={() => {
+            (router as any).push({
+              pathname: "/procedure/new",
+              params: {
+              photoUrl: capturedUri ?? "",
+              patientName: "",
+              patientRut: "",
+              date: new Date().toISOString(),
+              prestacionNumber: "",
+              diagnosis: "",
+              procedureName: "",
+              procedureCode: "",
+              type: "cirugia",
+              schedule: "habil",
+              clinic: "",
+              notes: "",
+            },
+          });
+        }}
+        style={[
+          styles.button,
+          {
+            backgroundColor: colors.surface,
+            borderWidth: 1,
+            borderColor: colors.border,
+          },
+        ]}
+>
+  <Text style={[styles.buttonText, { color: colors.foreground }]}>
+    Ingresar datos manualmente
+  </Text>
+</TouchableOpacity>
+
+          <TouchableOpacity
             onPress={() => {
               setCapturedUri(null);
               setCapturedBase64(null);
