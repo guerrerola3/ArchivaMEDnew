@@ -57,33 +57,43 @@ export default function CaptureScreen() {
   const extractMutation = trpc.procedures.extractFromPhoto.useMutation();
 
   // ─── Compress image for faster OCR ─────────────────────────────────────────
+
   const compressImage = async (base64: string): Promise<string> => {
-    try {
-      // Create a temporary URI from base64
-      const tempUri = `data:image/jpeg;base64,${base64}`;
+  try {
+    const tempUri = `data:image/jpeg;base64,${base64}`;
 
-      // Use ImageManipulator to resize and compress
-      const result = await ImageManipulator.manipulateAsync(tempUri, [
-        { resize: { width: 1200, height: 1600 } }, // Reduce to max 1200x1600
-      ]);
-
-      if (result.base64) {
-        // Calculate size reduction
-        const originalSize = base64.length;
-        const compressedSize = result.base64.length;
-        setCompressionStats({ original: originalSize, compressed: compressedSize });
-        const reduction = ((1 - compressedSize / originalSize) * 100).toFixed(0);
-        console.log(
-          `[OCR Compression] Original: ${(originalSize / 1024).toFixed(1)}KB → Compressed: ${(compressedSize / 1024).toFixed(1)}KB (${reduction}% reduction)`
-        );
-        return result.base64;
+    const result = await ImageManipulator.manipulateAsync(
+      tempUri,
+      [{ resize: { width: 8000 } }],
+      {
+        compress: 0.3,
+        format: ImageManipulator.SaveFormat.JPEG,
+        base64: true,
       }
-      return base64; // Fallback to original if compression fails
-    } catch (e) {
-      console.warn("[OCR Compression] Failed to compress image, using original:", e);
-      return base64; // Fallback to original on error
+    );
+
+    if (result.base64) {
+      const originalSize = base64.length;
+      const compressedSize = result.base64.length;
+
+      setCompressionStats({
+        original: originalSize,
+        compressed: compressedSize,
+      });
+
+      console.log(
+        `[OCR Compression] ${(originalSize / 1024).toFixed(1)}KB → ${(compressedSize / 1024).toFixed(1)}KB`
+      );
+
+      return result.base64;
     }
-  };
+
+    return base64;
+  } catch (e) {
+    console.warn("[OCR Compression] Failed:", e);
+    return base64;
+  }
+};
 
   // ─── Take photo with camera (base64 included directly) ─────────────────────
   const handleTakePhoto = async () => {
@@ -110,7 +120,7 @@ export default function CaptureScreen() {
   const handlePickFromGallery = async () => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ["images"],
         quality: 0.8,
         base64: true,
         allowsEditing: false,
@@ -130,6 +140,8 @@ export default function CaptureScreen() {
 
   // ─── Process OCR ────────────────────────────────────────────────────────────
   const handleProcessOCR = async () => {
+    console.log("📸 CLICK OCR");
+
     if (!capturedBase64) {
       Alert.alert(
         "Sin imagen",
@@ -138,6 +150,8 @@ export default function CaptureScreen() {
       return;
     }
 
+    console.log("🚀 CALLING BACKEND");
+    
     setStep("processing");
     setProcessingError(null);
 

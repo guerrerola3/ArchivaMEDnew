@@ -205,7 +205,7 @@ El JSON debe tener EXACTAMENTE esta estructura:
               ],
             },
           ],
-          maxTokens: 2000,
+          maxTokens: 800,
         });
 
         const responseText = llmResult.choices?.[0]?.message?.content;
@@ -223,7 +223,9 @@ El JSON debe tener EXACTAMENTE esta estructura:
           extractedData = ExtractedSchema.parse(parsed);
 
         } catch (err) {
-          console.error("Validation / parse error:", err);
+          console.error("❌ PARSE ERROR:");
+          console.error(err);
+          console.error("📦 RESPONSE:", responseStr);
 
           // fallback: guardamos al menos el texto completo
           extractedData = {
