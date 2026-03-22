@@ -1,5 +1,4 @@
 import { CameraView, useCameraPermissions } from "expo-camera";
-import * as ImageManipulator from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
 import { useRef, useState } from "react";
@@ -17,6 +16,7 @@ import {
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
+import { compressImageForOCR } from "@/lib/image-compression";
 import { trpc } from "@/lib/trpc";
 
 type CaptureStep = "camera" | "preview" | "processing" | "results";
@@ -59,41 +59,22 @@ export default function CaptureScreen() {
   // ─── Compress image for faster OCR ─────────────────────────────────────────
 
   const compressImage = async (base64: string): Promise<string> => {
-  try {
-    const tempUri = `data:image/jpeg;base64,${base64}`;
-
-    const result = await ImageManipulator.manipulateAsync(
-      tempUri,
-      [{ resize: { width: 8000 } }],
-      {
-        compress: 0.3,
-        format: ImageManipulator.SaveFormat.JPEG,
-        base64: true,
-      }
-    );
-
-    if (result.base64) {
+    try {
       const originalSize = base64.length;
-      const compressedSize = result.base64.length;
+      const compressedBase64 = await compressImageForOCR(base64);
+      const compressedSize = compressedBase64.length;
 
       setCompressionStats({
         original: originalSize,
         compressed: compressedSize,
       });
 
-      console.log(
-        `[OCR Compression] ${(originalSize / 1024).toFixed(1)}KB → ${(compressedSize / 1024).toFixed(1)}KB`
-      );
-
-      return result.base64;
+      return compressedBase64;
+    } catch (e) {
+      console.warn("[OCR Compression] Failed:", e);
+      return base64;
     }
-
-    return base64;
-  } catch (e) {
-    console.warn("[OCR Compression] Failed:", e);
-    return base64;
-  }
-};
+  };
 
   // ─── Take photo with camera (base64 included directly) ─────────────────────
   const handleTakePhoto = async () => {
