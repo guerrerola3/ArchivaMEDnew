@@ -23,6 +23,19 @@ const procedureSchema = z.object({
   invoiceIssued: z.boolean().optional(),
   isPaid: z.boolean().optional(),
 });
+const ExtractedSchema = z.object({
+  patientName: z.string().nullable(),
+  patientRut: z.string().nullable(),
+  date: z.string().nullable(),
+  prestacionNumber: z.string().nullable(),
+  diagnosis: z.string().nullable(),
+  procedureName: z.string().nullable(),
+  procedureCode: z.string().nullable(),
+  type: z.enum(["cirugia", "procedimiento", "interconsulta"]).nullable(),
+  schedule: z.enum(["habil", "inhabil"]).nullable(),
+  clinic: z.string().nullable(),
+  notes: z.string().nullable(),
+});
 
 export const appRouter = router({
   system: systemRouter,
@@ -139,11 +152,11 @@ export const appRouter = router({
 
 INSTRUCCIONES CRÍTICAS:
 1. NOMBRES Y APELLIDOS: En protocolos chilenos, el nombre suele estar en formato "Apellido, Nombre" o "Apellido Apellido, Nombre". IMPORTANTE: Extrae el nombre en orden natural: "Nombre Apellido(s)" (NO invertido). Si ves "García, Juan", devuelve "Juan García".
-2. NÚMERO DE PRESTACIÓN: Busca campos etiquetados como "Número de Prestación", "Número de Episodio", "Episodio", "Admisión", "N° Admisión", "N° Episodio" o "ID Prestación". Todos estos son equivalentes al campo prestacionNumber.
+2. NÚMERO DE PRESTACIÓN: Busca campos etiquetados como "Número de Prestación", "Número de Episodio", "Episodio", "Admisión", "Admisión Nº", "N° Admisión", "N° Episodio" o "ID Prestación". Todos estos son equivalentes al campo prestacionNumber.
 3. FECHA: Busca en formato DD/MM/YYYY, DD-MM-YYYY o similar. Convierte a ISO 8601 (YYYY-MM-DDTHH:mm:ss.000Z). Si solo hay fecha sin hora, usa 00:00:00.
 4. TIPO: Identifica si es una cirugía, procedimiento diagnóstico/terapéutico, o interconsulta.
-5. HORARIO: Determina si fue en horario hábil (lunes-viernes 8:00-17:00) o inhábil basándote en la fecha/hora si está disponible.
-6. DESCRIPCIÓN DEL PROCEDIMIENTO: Busca secciones tituladas "Descripción del Procedimiento", "Hallazgos Quirúrgicos", "Protocolo Quirúrgico", "Procedimiento Realizado", "Descripción de la Intervención", "Acto Quirúrgico" o "Tcnica Quirúrgica". Extrae el texto descriptivo completo (puede ser un párrafo largo con detalles de lo realizado). Este texto va en el campo "notes".
+5. HORARIO: Determina si fue en horario hábil (lunes-viernes 8:00-20:00) o inhábil basándote en la fecha/hora si está disponible.
+6. DESCRIPCIÓN DEL PROCEDIMIENTO: Busca secciones tituladas "Descripción del Procedimiento", "Hallazgos Quirúrgicos", "Protocolo Quirúrgico", "Procedimiento Realizado", "Descripción de la Intervención", "Acto Quirúrgico", "Detalle operatorio" o "Técnica Quirúrgica". Extrae el texto descriptivo completo (puede ser un párrafo largo con detalles de lo realizado). Este texto va en el campo "notes".
 
 Analiza la imagen y extrae los siguientes datos en formato JSON:
 - patientName: Nombre completo del paciente (en orden natural: Nombre Apellido, NO invertido)
@@ -159,7 +172,27 @@ Analiza la imagen y extrae los siguientes datos en formato JSON:
 - notes: Descripción completa del procedimiento/hallazgos quirúrgicos (texto de la sección de descripción si existe, puede ser largo)
 
 Si no puedes leer algún campo, déjalo como null.
-Responde SOLO con el JSON válido, sin texto adicional.`;
+Responde exclusivamente en JSON válido.
+NO incluyas explicaciones.
+NO incluyas markdown.
+NO uses json.
+Responde SOLO con el JSON válido, sin texto adicional.
+
+El JSON debe tener EXACTAMENTE esta estructura:
+
+{
+  "patientName": string | null,
+  "patientRut": string | null,
+  "date": string | null,
+  "prestacionNumber": string | null,
+  "diagnosis": string | null,
+  "procedureName": string | null,
+  "procedureCode": string | null,
+  "type": "cirugia" | "procedimiento" | "interconsulta" | null,
+  "schedule": "habil" | "inhabil" | null,
+  "clinic": string | null,
+  "notes": string | null
+}`;
 
         const llmResult = await invokeLLM({
           messages: [
@@ -179,11 +212,42 @@ Responde SOLO con el JSON válido, sin texto adicional.`;
         const responseStr = typeof responseText === "string" ? responseText : JSON.stringify(responseText);
 
         let extractedData: Record<string, unknown> = {};
+
         try {
-          const cleaned = responseStr.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
-          extractedData = JSON.parse(cleaned);
-        } catch {
-          console.error("Failed to parse LLM response:", responseStr);
+          const cleaned = responseStr
+          .replace(/```json\n?/g, "")
+          .replace(/```\n?/g, "")
+          .trim();
+
+          const parsed = JSON.parse(cleaned);
+          extractedData = ExtractedSchema.parse(parsed);
+
+        } catch (err) {
+          console.error("Validation / parse error:", err);
+
+          // fallback: guardamos al menos el texto completo
+          extractedData = {
+            notes: responseStr,
+          };
+        }
+
+        const normalizeRut = (rut?: string | null) => {
+          if (!rut) return null;
+          return rut
+          .replace(/\./g, "")
+          .replace(/-/g, "")
+          .replace(/(\d{7,8})([0-9kK])/, "$1-$2");
+        };
+
+        if (extractedData.patientRut) {
+          extractedData.patientRut = normalizeRut(extractedData.patientRut as string);
+        }
+
+        if (extractedData.date) {
+          const d = new Date(extractedData.date as string);
+          if (isNaN(d.getTime())) {
+            extractedData.date = null;
+          }
         }
 
         return { photoUrl, extractedData };
