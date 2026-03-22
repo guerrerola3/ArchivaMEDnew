@@ -29,24 +29,29 @@ export const API_BASE_URL = env.apiBaseUrl;
  * Metro runs on 8081, API server runs on 3000.
  * URL pattern: https://PORT-sandboxid.region.domain
  */
+
 export function getApiBaseUrl(): string {
-  // If API_BASE_URL is set, use it
+  // 1. Usa env si existe (PRIORIDAD)
   if (API_BASE_URL) {
     return API_BASE_URL.replace(/\/$/, "");
   }
 
-  // On web, derive from current hostname by replacing port 8081 with 3000
-  if (ReactNative.Platform.OS === "web" && typeof window !== "undefined" && window.location) {
+  // 2. En browser (Expo Web)
+  if (typeof window !== "undefined") {
     const { protocol, hostname } = window.location;
-    // Pattern: 8081-sandboxid.region.domain -> 3000-sandboxid.region.domain
+
+    // 🔥 Fix automático Codespaces: 8081 → 3000
     const apiHostname = hostname.replace(/^8081-/, "3000-");
+
     if (apiHostname !== hostname) {
       return `${protocol}//${apiHostname}`;
     }
+
+    return window.location.origin;
   }
 
-  // Fallback to empty (will use relative URL)
-  return "";
+  // 3. Backend fallback
+  return "http://localhost:3000";
 }
 
 export const SESSION_TOKEN_KEY = "app_session_token";
