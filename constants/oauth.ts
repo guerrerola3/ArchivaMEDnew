@@ -31,26 +31,32 @@ export const API_BASE_URL = env.apiBaseUrl;
  */
 
 export function getApiBaseUrl(): string {
-  // 1. Usa env si existe (PRIORIDAD)
-  if (API_BASE_URL) {
+  // 1. Usa env si existe (PRIORIDAD MÁXIMA)
+  if (API_BASE_URL && API_BASE_URL.trim().length > 0) {
+    console.log("[API] Using EXPO_PUBLIC_API_BASE_URL:", API_BASE_URL);
     return API_BASE_URL.replace(/\/$/, "");
   }
 
   // 2. En browser (Expo Web)
   if (typeof window !== "undefined") {
     const { protocol, hostname } = window.location;
+    console.log("[API] Browser detected. Current hostname:", hostname);
 
     // 🔥 Fix automático Codespaces: 8081 → 3000
     const apiHostname = hostname.replace(/^8081-/, "3000-");
 
     if (apiHostname !== hostname) {
-      return `${protocol}//${apiHostname}`;
+      const url = `${protocol}//${apiHostname}`;
+      console.log("[API] Transformed URL:", url);
+      return url;
     }
 
+    console.log("[API] Using window.location.origin:", window.location.origin);
     return window.location.origin;
   }
 
   // 3. Backend fallback
+  console.warn("[API] No environment variable set, using localhost fallback");
   return "http://localhost:3000";
 }
 

@@ -1,155 +1,24 @@
 import { z } from "zod";
-import { COOKIE_NAME } from "../shared/const.js";
-import { getSessionCookieOptions } from "./_core/cookies";
-import { systemRouter } from "./_core/systemRouter";
-import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
-import * as db from "./db";
-import { invokeLLM } from "./_core/llm";
+import { router, protectedProcedure, publicProcedure } from "./_core/trpc";
 import { storagePut } from "./storage";
-
-const procedureSchema = z.object({
-  patientName: z.string().min(1),
-  patientRut: z.string().min(1),
-  date: z.string(),
-  prestacionNumber: z.string().optional().nullable(),
-  diagnosis: z.string().optional().nullable(),
-  procedureName: z.string().optional().nullable(),
-  procedureCode: z.string().optional().nullable(),
-  type: z.enum(["cirugia", "procedimiento", "interconsulta"]),
-  schedule: z.enum(["habil", "inhabil"]),
-  clinic: z.string().min(1),
-  photoUrl: z.string().optional().nullable(),
-  notes: z.string().optional().nullable(),
-  invoiceIssued: z.boolean().optional(),
-  isPaid: z.boolean().optional(),
-});
-const ExtractedSchema = z.object({
-  patientName: z.string().nullable(),
-  patientRut: z.string().nullable(),
-  date: z.string().nullable(),
-  prestacionNumber: z.string().nullable(),
-  diagnosis: z.string().nullable(),
-  procedureName: z.string().nullable(),
-  procedureCode: z.string().nullable(),
-  type: z.enum(["cirugia", "procedimiento", "interconsulta"]).nullable(),
-  schedule: z.enum(["habil", "inhabil"]).nullable(),
-  clinic: z.string().nullable(),
-  notes: z.string().nullable(),
-});
+import { invokeLLM } from "./_core/llm";
 
 export const appRouter = router({
-  system: systemRouter,
-  auth: router({
-    me: publicProcedure.query((opts) => opts.ctx.user),
-    logout: publicProcedure.mutation(({ ctx }) => {
-      const cookieOptions = getSessionCookieOptions(ctx.req);
-      ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
-      return { success: true } as const;
-    }),
-  }),
+  health: publicProcedure.query(() => ({ status: "ok" })),
 
-  procedures: router({
-    list: protectedProcedure
-      .input(z.object({
-        startDate: z.string().optional(),
-        endDate: z.string().optional(),
-        type: z.enum(["cirugia", "procedimiento", "interconsulta"]).optional(),
-        clinic: z.string().optional(),
-      }).optional())
-      .query(({ ctx, input }) => {
-        return db.getUserProcedures(ctx.user.id, {
-          startDate: input?.startDate ? new Date(input.startDate) : undefined,
-          endDate: input?.endDate ? new Date(input.endDate) : undefined,
-          type: input?.type,
-          clinic: input?.clinic,
-        });
-      }),
+  extractFromPhoto: publicProcedure
+    .input(z.object({
+      imageBase64: z.string(),
+      mimeType: z.string().default("image/jpeg"),
+      localOcrText: z.string().nullable().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.user?.id ?? "anon";
+      const imageBuffer = Buffer.from(input.imageBase64, "base64");
+      const fileName = `procedures/${userId}/${Date.now()}.jpg`;
+      const { url: photoUrl } = await storagePut(fileName, imageBuffer, input.mimeType);
 
-    byPeriod: protectedProcedure
-      .input(z.object({ year: z.number(), month: z.number().optional() }))
-      .query(({ ctx, input }) => {
-        return db.getProceduresByPeriod(ctx.user.id, input.year, input.month);
-      }),
-
-    get: protectedProcedure
-      .input(z.object({ id: z.number() }))
-      .query(({ ctx, input }) => {
-        return db.getProcedureById(input.id, ctx.user.id);
-      }),
-
-    create: protectedProcedure
-      .input(procedureSchema)
-      .mutation(({ ctx, input }) => {
-        return db.createProcedure({
-          userId: ctx.user.id,
-          patientName: input.patientName,
-          patientRut: input.patientRut,
-          date: new Date(input.date),
-          prestacionNumber: input.prestacionNumber ?? undefined,
-          diagnosis: input.diagnosis ?? undefined,
-          procedureName: input.procedureName ?? undefined,
-          procedureCode: input.procedureCode ?? undefined,
-          type: input.type,
-          schedule: input.schedule,
-          clinic: input.clinic,
-          photoUrl: input.photoUrl ?? undefined,
-          notes: input.notes ?? undefined,
-        });
-      }),
-
-    update: protectedProcedure
-      .input(z.object({ id: z.number() }).merge(procedureSchema.partial()))
-      .mutation(({ ctx, input }) => {
-        const { id, ...data } = input;
-        const updateData: any = {
-          ...data,
-          date: data.date ? new Date(data.date) : undefined,
-        };
-        // Convert boolean to number for database compatibility
-        if (data.invoiceIssued !== undefined) {
-          updateData.invoiceIssued = data.invoiceIssued ? 1 : 0;
-        }
-        if (data.isPaid !== undefined) {
-          updateData.isPaid = data.isPaid ? 1 : 0;
-        }
-        return db.updateProcedure(id, ctx.user.id, updateData);
-      }),
-
-    delete: protectedProcedure
-      .input(z.object({ id: z.number() }))
-      .mutation(({ ctx, input }) => {
-        return db.deleteProcedure(input.id, ctx.user.id);
-      }),
-
-    updatePaymentStatus: protectedProcedure
-      .input(z.object({
-        id: z.number(),
-        invoiceIssued: z.boolean().optional(),
-        isPaid: z.boolean().optional(),
-      }))
-      .mutation(({ ctx, input }) => {
-        return db.updateProcedurePaymentStatus(
-          input.id,
-          ctx.user.id,
-          input.invoiceIssued,
-          input.isPaid
-        );
-      }),
-
-    extractFromPhoto: publicProcedure
-      .input(z.object({
-        imageBase64: z.string(),
-        mimeType: z.string().default("image/jpeg"),
-        localOcrText: z.string().nullable().optional(), // Nuevo campo para el texto OCR local
-      }))
-      .mutation(async ({ ctx, input }) => {
-        // Upload image to storage (use user id if authenticated, else anonymous)
-        const userId = ctx.user?.id ?? "anon";
-        const imageBuffer = Buffer.from(input.imageBase64, "base64");
-        const fileName = `procedures/${userId}/${Date.now()}.jpg`;
-        const { url: photoUrl } = await storagePut(fileName, imageBuffer, input.mimeType);
-
-        const systemMessage = `Eres un asistente médico especializado en extraer datos de protocolos operatorios y fichas clínicas chilenas.
+      const systemMessage = `Eres un asistente médico especializado en extraer datos de protocolos operatorios y fichas clínicas chilenas.
 
 INSTRUCCIONES CRÍTICAS:
 1. NOMBRES Y APELLIDOS: En protocolos chilenos, el nombre suele estar en formato "Apellido, Nombre" o "Apellido Apellido, Nombre". IMPORTANTE: Extrae el nombre en orden natural: "Nombre Apellido(s)" (NO invertido). Si ves "García, Juan", devuelve "Juan García".
@@ -195,67 +64,48 @@ El JSON debe tener EXACTAMENTE esta estructura:
   "notes": string | null
 }`;
 
-        const llmResult = await invokeLLM({
+      console.log("[OCR] Invoking LLM for extraction...");
+      let llmResult;
+      try {
+        llmResult = await invokeLLM({
           messages: [
             { role: "system", content: systemMessage },
             {
               role: "user",
               content: [
-                { type: "text", text: `Extrae TODOS los datos de este protocolo operatorio o ficha clínica chilena. IMPORTANTE: (1) El nombre del paciente debe estar en orden natural (Nombre Apellido), NO invertido. (2) Busca cualquier campo que diga \'Número de Episodio\', \'Admisión\', \'N° Episodio\' o similar - son equivalentes a \'Número de Prestación\'. (3) En el campo \'notes\', extrae la descripción completa del procedimiento/hallazgos quirúrgicos si existe. Responde SOLO con JSON válido.${input.localOcrText ? `\n\nTEXTO OCR LOCAL (como referencia, si la imagen es ilegible):\n${input.localOcrText}` : ""}` },
+                { type: "text", text: `Extrae TODOS los datos de este protocolo operatorio o ficha clínica chilena. IMPORTANTE: (1) El nombre del paciente debe estar en orden natural (Nombre Apellido), NO invertido. (2) Busca cualquier campo que diga 'Número de Episodio', 'Admisión', 'N° Episodio' o similar - son equivalentes a 'Número de Prestación'. (3) En el campo 'notes', extrae la descripción completa del procedimiento/hallazgos quirúrgicos si existe. Responde SOLO con JSON válido.${input.localOcrText ? `\n\nTEXTO OCR LOCAL (como referencia, si la imagen es ilegible):\n${input.localOcrText}` : ""}` },
                 { type: "image_url", image_url: { url: `data:${input.mimeType};base64,${input.imageBase64}`, detail: "high" } },
               ],
             },
           ],
-          maxTokens: 800,
+          maxTokens: 2000,
         });
+      } catch (error) {
+        console.error("[OCR] LLM invocation failed:", error);
+        throw new Error(`Error al contactar el motor de IA: ${error instanceof Error ? error.message : String(error)}`);
+      }
 
-        const responseText = llmResult.choices?.[0]?.message?.content;
-        const responseStr = typeof responseText === "string" ? responseText : JSON.stringify(responseText);
+      const content = llmResult.choices[0].message.content;
+      console.log("[OCR] LLM Raw Response:", content);
 
-        let extractedData: Record<string, unknown> = {};
+      if (typeof content !== "string") {
+        console.error("[OCR] Invalid LLM response format:", typeof content);
+        throw new Error("El motor de IA devolvió un formato inválido.");
+      }
 
-        try {
-          const cleaned = responseStr
-          .replace(/```json\n?/g, "")
-          .replace(/```\n?/g, "")
-          .trim();
-
-          const parsed = JSON.parse(cleaned);
-          extractedData = ExtractedSchema.parse(parsed);
-
-        } catch (err) {
-          console.error("❌ PARSE ERROR:");
-          console.error(err);
-          console.error("📦 RESPONSE:", responseStr);
-
-          // fallback: guardamos al menos el texto completo
-          extractedData = {
-            notes: responseStr,
-          };
-        }
-
-        const normalizeRut = (rut?: string | null) => {
-          if (!rut) return null;
-          return rut
-          .replace(/\./g, "")
-          .replace(/-/g, "")
-          .replace(/(\d{7,8})([0-9kK])/, "$1-$2");
+      try {
+        const cleanContent = content.replace(/```json|```/g, "").trim();
+        const extractedData = JSON.parse(cleanContent);
+        console.log("[OCR] Successfully extracted data:", JSON.stringify(extractedData, null, 2));
+        return {
+          photoUrl,
+          extractedData,
         };
-
-        if (extractedData.patientRut) {
-          extractedData.patientRut = normalizeRut(extractedData.patientRut as string);
-        }
-
-        if (extractedData.date) {
-          const d = new Date(extractedData.date as string);
-          if (isNaN(d.getTime())) {
-            extractedData.date = null;
-          }
-        }
-
-        return { photoUrl, extractedData };
-      }),
-  }),
+      } catch (e) {
+        console.error("[OCR] Failed to parse LLM response as JSON:", content);
+        throw new Error("No se pudo procesar la respuesta de la IA como datos válidos.");
+      }
+    }),
 });
 
 export type AppRouter = typeof appRouter;
