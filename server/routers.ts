@@ -200,7 +200,8 @@ El JSON debe tener EXACTAMENTE esta estructura:
             { role: "system", content: systemMessage },
             {
               role: "user",
-              c                { type: "text", text: `Extrae TODOS los datos de este protocolo operatorio o ficha clínica chilena. IMPORTANTE: (1) El nombre del paciente debe estar en orden natural (Nombre Apellido), NO invertido. (2) Busca cualquier campo que diga \'Número de Episodio\', \'Admisión\', \'N° Episodio\' o similar - son equivalentes a \'Número de Prestación\'. (3) En el campo \'notes\', extrae la descripción completa del procedimiento/hallazgos quirúrgicos si existe. Responde SOLO con JSON válido.${input.localOcrText ? `\n\nTEXTO OCR LOCAL (como referencia, si la imagen es ilegible):\n${input.localOcrText}` : ""}` },
+              content: [
+                { type: "text", text: `Extrae TODOS los datos de este protocolo operatorio o ficha clínica chilena. IMPORTANTE: (1) El nombre del paciente debe estar en orden natural (Nombre Apellido), NO invertido. (2) Busca cualquier campo que diga \'Número de Episodio\', \'Admisión\', \'N° Episodio\' o similar - son equivalentes a \'Número de Prestación\'. (3) En el campo \'notes\', extrae la descripción completa del procedimiento/hallazgos quirúrgicos si existe. Responde SOLO con JSON válido.${input.localOcrText ? `\n\nTEXTO OCR LOCAL (como referencia, si la imagen es ilegible):\n${input.localOcrText}` : ""}` },
                 { type: "image_url", image_url: { url: `data:${input.mimeType};base64,${input.imageBase64}`, detail: "high" } },
               ],
             },
