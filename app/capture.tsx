@@ -3,6 +3,7 @@ import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
 import { useRef, useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import TextRecognition from "@react-native-ml-kit/text-recognition";
 import {
   ActivityIndicator,
   Alert,
@@ -47,6 +48,7 @@ export default function CaptureScreen() {
   const [extractedData, setExtractedData] = useState<ExtractedData | null>(null);
   const [uploadedPhotoUrl, setUploadedPhotoUrl] = useState<string | null>(null);
   const [processingError, setProcessingError] = useState<string | null>(null);
+  const [localOcrText, setLocalOcrText] = useState<string | null>(null);
   const [facing, setFacing] = useState<"back" | "front">("back");
   const insets = useSafeAreaInsets();
   const [compressionStats, setCompressionStats] = useState<{
@@ -119,6 +121,21 @@ export default function CaptureScreen() {
     }
   };
 
+  // ─── Local OCR Processing ───────────────────────────────────────────────────
+  const performLocalOcr = async (imageUri: string): Promise<string | null> => {
+    try {
+      const result = await TextRecognition.recognize(imageUri);
+      const extractedText = result.textBlocks.map(block => block.text).join('\n');
+      console.log("[Local OCR] Extracted text:", extractedText);
+      setLocalOcrText(extractedText);
+      return extractedText;
+    } catch (e) {
+      console.error("[Local OCR] Failed:", e);
+      setLocalOcrText("Error al realizar OCR local.");
+      return null;
+    }
+  };
+
   // ─── Process OCR ────────────────────────────────────────────────────────────
   const handleProcessOCR = async () => {
     console.log("📸 CLICK OCR");
@@ -141,10 +158,14 @@ export default function CaptureScreen() {
       console.log("[OCR] Starting image compression...");
       const compressedBase64 = await compressImage(capturedBase64);
 
-      console.log("[OCR] Sending compressed image to LLM...");
+      console.log("[OCR] Performing local OCR...");
+      const ocrText = await performLocalOcr(capturedUri!);
+
+      console.log("[OCR] Sending compressed image and local OCR text to LLM...");
       const result = await extractMutation.mutateAsync({
         imageBase64: compressedBase64,
         mimeType: "image/jpeg",
+        localOcrText: ocrText, // Enviar el texto OCR local al backend
       });
 
       setUploadedPhotoUrl(result.photoUrl ?? capturedUri);
