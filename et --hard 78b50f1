@@ -1,0 +1,35 @@
+[33m11d52db[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m)[m mensaje explicando lo que hiciste
+[33m84cb37e[m[33m ([m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m true message
+[33m60d9a2a[m Checkpoint: Limpieza y reconstrucción completa de archivos de configuración para resolver problemas de build en Android e iOS:
+[33m209ecf3[m Rollback to 78b50f1
+[33m9f23cc3[m Checkpoint: Configuración completa de EAS para permitir compilación sin errores en APK e iOS:
+[33m9b3979a[m Checkpoint: Revisión y corrección minuciosa de todo el código para resolver errores de compilación en APK e iOS:
+[33m008dfee[m Checkpoint: Corregida la configuración de eas.json para resolver los errores de validación:
+[33mdeb7488[m Checkpoint: Configurado EAS (Expo Application Services) para permitir la publicación en iOS:
+[33m78b50f1[m Checkpoint: Convertido el campo "Previsión" a un campo de texto libre (string) en lugar de dropdown con opciones predefinidas:
+[33m5ab5b58[m Checkpoint: Implementada detección automática mejorada del campo "Previsión" desde fotos del protocolo:
+[33ma42fddb[m Checkpoint: Implementada la funcionalidad completa del campo "Previsión" (seguro de salud) en ArchivaMED:
+[33m9a55f31[m[33m ([m[1;31morigin/Listo[m[33m, [m[1;32mListo[m[33m)[m Checkpoint: Implementados cambios en la pantalla de Inicio:
+[33me755a4d[m Checkpoint: Implementado banner ArchivaMED en la parte superior de la pantalla de Inicio:
+[33m551ced5[m Checkpoint: Implementados dos cambios de simplificación de UI:
+[33mdadbd06[m Checkpoint: Implementadas tres mejoras principales:
+[33mc8482f5[m Checkpoint: Implementadas tres mejoras principales:
+[33m4cbfe04[m Checkpoint: Implementadas tres mejoras principales:
+[33m4b1d0a8[m Checkpoint: Arreglado el componente PhotoDetailModal para que la foto se vea completa y los botones estén bien posicionados:
+[33ma818089[m Checkpoint: Implementada la funcionalidad para ver la foto del protocolo al hacer click en la pantalla de detalle de procedimiento:
+[33md5b4d57[m Checkpoint: Implementados tres cambios solicitados:
+[33m8e11ea1[m Checkpoint: Implementada la funcionalidad de visualización en detalle de la foto del protocolo:
+[33m31be98d[m Checkpoint: Implementadas dos mejoras importantes en ArchivaMED:
+[33mbd2cdeb[m Checkpoint: Implementadas mejoras significativas en la interfaz de seguimiento de pagos:
+[33ma553fa8[m Checkpoint: Implementada funcionalidad completa de seguimiento de pagos y facturación en ArchivaMED:
+[33m2f82d19[m Checkpoint: Corregidos todos los problemas de branding: (1) Reiniciado el servidor de desarrollo para que cargue el nuevo logo, (2) Actualizado el nombre "TraumaLog" a "ArchivaMED" en la página principal (index.tsx), (3) Actualizado el nombre en los reportes PDF y Excel (export.tsx), (4) Actualizado el nombre en los nombres de archivos exportados. Ahora la app muestra correctamente el nuevo branding ArchivaMED en todas las pantallas.
+[33m2b8a9c0[m Checkpoint: Actualizado el branding completo de la aplicación: (1) Nuevo logo neon medical icon (archivo icon.png con diseño profesional de neon azul y verde), (2) Nombre de app cambiado de "TraumaLog" a "ArchivaMED", (3) Logo aplicado a todas las ubicaciones requeridas: icon.png, splash-icon.png, favicon.png, android-icon-foreground.png. La app ahora se identifica como ArchivaMED en el launcher y en toda la interfaz.
+[33mbcfb63b[m Checkpoint: Mejorado el OCR para detectar y extraer la descripción completa del procedimiento quirúrgico en el campo de notas. El prompt ahora busca secciones tituladas "Descripción del Procedimiento", "Hallazgos Quirúrgicos", "Protocolo Quirúrgico", "Procedimiento Realizado", "Descripción de la Intervención", "Acto Quirúrgico" o "Técnica Quirúrgica" y extrae el texto descriptivo completo (puede ser un párrafo largo con detalles de lo realizado). Se aumentó el límite de tokens a 2000 para permitir respuestas más largas con descripciones detalladas.
+[33mdf5c740[m Checkpoint: Optimizada la velocidad del OCR mediante: (1) compresión de imagen en el cliente antes de enviar al servidor (redimensionamiento a 1200x1600 máximo), (2) indicador visual de progreso con estadísticas de compresión, (3) logging detallado para diagnóstico de rendimiento. La compresión reduce típicamente el tamaño de imagen en 40-60%, acelerando significativamente el procesamiento del LLM.
+[33m29f1baa[m Checkpoint: Implementadas 4 mejoras de UX: (1) redirección a pantalla principal después de guardar, (2) remover asteriscos rojos de campos obligatorios, (3) buscador en procedimientos, (4) período personalizable con filtro de tipos en exportación
+[33mb3ecc6b[m Checkpoint: OCR Improvements v1.2: Mejorado el prompt del LLM para (1) reconocer "Número de Episodio", "Admisión", "N° Episodio" y "N° Admisión" como equivalentes al campo prestacionNumber; (2) corregir la inversión de nombres y apellidos extrayendo en orden natural "Nombre Apellido" en lugar de "Apellido, Nombre"; (3) instrucciones explícitas para protocolos chilenos con ejemplos concretos; (4) mejor manejo de fechas en formato DD/MM/YYYY.
+[33mfdea53d[m Checkpoint: Fix Exportación v1.1: Corregidos los botones de exportación PDF y Excel. Cambios: (1) PDF: eliminado el paso innecesario de mover el archivo con FileSystem.moveAsync — ahora se comparte directamente desde el URI temporal de printToFileAsync; (2) Excel: simplificado el nombre de archivo para evitar caracteres especiales; (3) Ambos: mensajes de error ahora son visibles en pantalla con Alert.alert y se registran en consola; (4) Impresión: manejo correcto para web vs nativo.
+[33m73c841c[m Checkpoint: Fix OCR v1.2 (definitivo): Eliminado el uso de FileSystem.readAsStringAsync que fallaba con URIs de cámara y galería en iOS. Ahora el base64 se obtiene directamente desde expo-camera (takePictureAsync con base64:true) y expo-image-picker (launchImageLibraryAsync con base64:true), que es el método nativo y más confiable. Eliminada la dependencia de expo-file-system/legacy en capture.tsx.
+[33m58958fe[m Checkpoint: Fix OCR v1.1: Corregido el flujo de reconocimiento de texto desde fotos. Cambios: (1) extractFromPhoto ahora es publicProcedure (no requiere login), (2) lectura de imagen via FileSystem.readAsStringAsync con soporte para URIs ph:// de iOS, (3) pantalla de resultados OCR con preview de campos detectados antes de navegar al formulario, (4) permisos de cámara y galería configurados en app.config.ts.
+[33mff65f94[m Checkpoint: TraumaLog v1.0 - Aplicación completa para traumatólogos con: dashboard de estadísticas, lista de procedimientos agrupada por meses, captura con cámara + OCR con IA, formulario editable, exportación a Excel/PDF/impresión, sincronización nube+local, logo personalizado.
+[33m50500c0[m Initial project bootstrap
