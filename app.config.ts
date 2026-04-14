@@ -6,7 +6,7 @@ import type { ExpoConfig } from "expo/config";
 // e.g., "my-app" created at 2024-01-15 10:30:45 -> "space.manus.my.app.t20240115103045"
 // Bundle ID can only contain letters, numbers, and dots
 // Android requires each dot-separated segment to start with a letter
-const rawBundleId = "space.manus.trauma_surgery_app.t20260307092533";
+const rawBundleId = "com.archivamed.app";
 const bundleId =
   rawBundleId
     .replace(/[-_]/g, ".") // Replace hyphens/underscores with dots
@@ -24,12 +24,12 @@ const bundleId =
 // Extract timestamp from bundle ID and prefix with "manus" for deep link scheme
 // e.g., "space.manus.my.app.t20240115103045" -> "manus20240115103045"
 const timestamp = bundleId.split(".").pop()?.replace(/^t/, "") ?? "";
-const schemeFromBundleId = `manus${timestamp}`;
+const schemeFromBundleId = `archivamed`;
 
 const env = {
   // App branding - update these values directly (do not use env vars)
   appName: "ArchivaMED",
-  appSlug: "trauma_surgery_app",
+  appSlug: "archivamed",
   // S3 URL of the app logo - set this to the URL returned by generate_image when creating custom logo
   // Leave empty to use the default icon from assets/images/icon.png
   logoUrl: "",
@@ -41,17 +41,21 @@ const env = {
 const config: ExpoConfig = {
   name: env.appName,
   slug: env.appSlug,
-  version: "1.0.0",
+  version: "1.0.1",
   orientation: "portrait",
   icon: "./assets/images/icon.png",
   scheme: env.scheme,
   userInterfaceStyle: "automatic",
-  newArchEnabled: true,
+  newArchEnabled: false,
   ios: {
-    supportsTablet: true,
+    buildNumber: "2",
+    supportsTablet: false,
     bundleIdentifier: env.iosBundleId,
     "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        CFBundleDevelopmentRegion: "es",
+        NSCameraUsageDescription: "Escaneo de documentos médicos. Los datos se almacenan localmente en el dispositivo.",
+        NSPhotoLibraryUsageDescription: "Permite seleccionar imágenes de documentos médicos para su análisis.",
       }
   },
   android: {
@@ -64,7 +68,7 @@ const config: ExpoConfig = {
     edgeToEdgeEnabled: true,
     predictiveBackGestureEnabled: false,
     package: env.androidPackage,
-    permissions: ["POST_NOTIFICATIONS"],
+    permissions: ["CAMERA"],
     intentFilters: [
       {
         action: "VIEW",
@@ -91,29 +95,16 @@ const config: ExpoConfig = {
     [
       "expo-camera",
       {
-        cameraPermission: "Permitir que TraumaLog acceda a la cámara para fotografiar protocolos operatorios.",
-        microphonePermission: "Permitir que TraumaLog acceda al micrófono.",
+        cameraPermission: "Permitir que ArchivaMED acceda a la cámara para fotografiar protocolos operatorios.",
+        microphonePermission: "Permitir que ArchivaMED acceda al micrófono.",
         recordAudioAndroid: false,
       },
     ],
     [
       "expo-image-picker",
       {
-        photosPermission: "Permitir que TraumaLog acceda a tus fotos para importar protocolos operatorios.",
-        cameraPermission: "Permitir que TraumaLog acceda a la cámara para fotografiar protocolos operatorios.",
-      },
-    ],
-    [
-      "expo-audio",
-      {
-        microphonePermission: "Allow $(PRODUCT_NAME) to access your microphone.",
-      },
-    ],
-    [
-      "expo-video",
-      {
-        supportsBackgroundPlayback: true,
-        supportsPictureInPicture: true,
+        photosPermission: "Permitir que ArchivaMED acceda a tus fotos para importar protocolos operatorios.",
+        cameraPermission: "Permitir que ArchivaMED acceda a la cámara para fotografiar protocolos operatorios.",
       },
     ],
     [
