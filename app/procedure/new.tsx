@@ -55,6 +55,7 @@ export default function NewProcedureScreen() {
         diagnosis: data.diagnosis || null,
         procedureName: data.procedureName || null,
         procedureCode: data.procedureCode || null,
+        provision: data.provision || null,
         notes: data.notes || null,
         photoUrl: data.photoUrl,
       });

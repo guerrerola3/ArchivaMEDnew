@@ -17,7 +17,7 @@ import {
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
-import { trpc } from "@/lib/trpc";
+import { extractProcedureDataLocally } from "@/lib/local-procedure-extractor";
 
 type CaptureStep = "camera" | "preview" | "processing" | "results";
 
@@ -34,6 +34,7 @@ interface ExtractedData {
   clinic?: string | null;
   provision?: string | null;
   notes?: string | null;
+  rawText?: string | null;
 }
 
 export default function CaptureScreen() {
@@ -48,18 +49,19 @@ export default function CaptureScreen() {
   const [extractedData, setExtractedData] = useState<ExtractedData | null>(null);
   const [uploadedPhotoUrl, setUploadedPhotoUrl] = useState<string | null>(null);
   const [processingError, setProcessingError] = useState<string | null>(null);
+  const [processingNotice, setProcessingNotice] = useState<string | null>(null);
+  const [ocrTextPreview, setOcrTextPreview] = useState<string | null>(null);
   const [facing, setFacing] = useState<"back" | "front">("back");
   const insets = useSafeAreaInsets();
   const [compressionStats, setCompressionStats] = useState<{ original: number; compressed: number } | null>(null);
-
-  const extractMutation = trpc.procedures.extractFromPhoto.useMutation();
+  const [isExtracting, setIsExtracting] = useState(false);
 
   // ─── Compress image ─────────────────────────────────────────────
-  const compressImage = async (base64: string): Promise<string> => {
+  const compressImage = async (uri: string | null, base64: string): Promise<{ base64: string; uri: string | null }> => {
     try {
-      const tempUri = `data:image/jpeg;base64,${base64}`;
+      const source = uri ?? `data:image/jpeg;base64,${base64}`;
       const result = await ImageManipulator.manipulateAsync(
-        tempUri,
+        source,
         [{ resize: { width: 1080 } }],
         { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG, base64: true }
       );
@@ -68,12 +70,12 @@ export default function CaptureScreen() {
         const compressedSize = result.base64.length;
         setCompressionStats({ original: originalSize, compressed: compressedSize });
         console.log(`[OCR Compression] ${Math.round(originalSize/1024)}KB → ${Math.round(compressedSize/1024)}KB`);
-        return result.base64;
+        return { base64: result.base64, uri: result.uri ?? uri };
       }
-      return base64;
+      return { base64, uri };
     } catch (e) {
       console.warn("[OCR Compression] Failed:", e);
-      return base64;
+      return { base64, uri };
     }
   };
 
@@ -119,28 +121,27 @@ export default function CaptureScreen() {
     if (!capturedBase64) return;
     setStep("processing");
     setProcessingError(null);
+    setProcessingNotice(null);
+    setIsExtracting(true);
 
     try {
-      const compressedBase64 = await compressImage(capturedBase64);
-
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 30000); // 30s timeout
-
-      const result = await extractMutation.mutateAsync(
-        { imageBase64: compressedBase64, mimeType: "image/jpeg" },
-        { signal: controller.signal }
-      );
-
-      clearTimeout(timeout);
+      const compressedImage = await compressImage(capturedUri, capturedBase64);
+      const result = await extractProcedureDataLocally({
+        photoUrl: capturedUri,
+        imageUri: compressedImage.uri,
+        imageBase64: compressedImage.base64,
+      });
       setUploadedPhotoUrl(result.photoUrl ?? capturedUri);
       setExtractedData(result.extractedData as ExtractedData);
+      setProcessingNotice(result.warnings.join(" ") || null);
+      setOcrTextPreview(result.rawText ?? null);
       setStep("results");
-    } catch (e: any) {
-      console.error("OCR mutation error:", e);
-      let msg = "No se pudieron extraer los datos automáticamente.";
-      if (e.name === "AbortError") msg = "La solicitud de OCR tardó demasiado. Intente con una imagen más pequeña.";
-      setProcessingError(msg);
+    } catch (e) {
+      console.error("Local extraction error:", e);
+      setProcessingError("No se pudieron preparar los datos automáticamente.");
       setStep("preview");
+    } finally {
+      setIsExtracting(false);
     }
   };
 
@@ -229,8 +230,8 @@ export default function CaptureScreen() {
           {processingError && <View style={[styles.errorBox, { backgroundColor: colors.error + "20", borderColor: colors.error }]}>
             <Text style={[styles.errorText, { color: colors.error }]}>{processingError}</Text>
           </View>}
-          <TouchableOpacity onPress={handleProcessOCR} disabled={extractMutation.isPending} style={[styles.button, { backgroundColor: colors.primary, opacity: extractMutation.isPending?0.6:1 }]}>
-            {extractMutation.isPending ? <ActivityIndicator color="white"/> : <>
+          <TouchableOpacity onPress={handleProcessOCR} disabled={isExtracting} style={[styles.button, { backgroundColor: colors.primary, opacity: isExtracting?0.6:1 }]}>
+            {isExtracting ? <ActivityIndicator color="white"/> : <>
               <IconSymbol name="sparkles" size={18} color="white"/>
               <Text style={styles.buttonText}>Extraer datos</Text>
             </>}
@@ -268,15 +269,29 @@ export default function CaptureScreen() {
       </View>
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {uploadedPhotoUrl && <Image source={{ uri: uploadedPhotoUrl }} style={styles.resultImage} />}
+        {processingNotice && <View style={[styles.errorBox, { backgroundColor: colors.warning + "20", borderColor: colors.warning }]}>
+          <Text style={[styles.errorText, { color: colors.warning }]}>{processingNotice}</Text>
+        </View>}
         <View style={[styles.dataContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <Text style={[styles.dataTitle, { color: colors.primary }]}>Datos detectados</Text>
           {extractedData?.patientName && <View style={styles.dataRow}><Text style={[styles.dataLabel, { color: colors.muted }]}>Paciente:</Text><Text style={[styles.dataValue, { color: colors.foreground }]}>{extractedData.patientName}</Text></View>}
           {extractedData?.patientRut && <View style={styles.dataRow}><Text style={[styles.dataLabel, { color: colors.muted }]}>RUT:</Text><Text style={[styles.dataValue, { color: colors.foreground }]}>{extractedData.patientRut}</Text></View>}
+          {extractedData?.date && <View style={styles.dataRow}><Text style={[styles.dataLabel, { color: colors.muted }]}>Fecha:</Text><Text style={[styles.dataValue, { color: colors.foreground }]}>{new Date(extractedData.date).toLocaleString("es-CL")}</Text></View>}
           {extractedData?.prestacionNumber && <View style={styles.dataRow}><Text style={[styles.dataLabel, { color: colors.muted }]}>Prestación:</Text><Text style={[styles.dataValue, { color: colors.foreground }]}>{extractedData.prestacionNumber}</Text></View>}
           {extractedData?.diagnosis && <View style={styles.dataRow}><Text style={[styles.dataLabel, { color: colors.muted }]}>Diagnóstico:</Text><Text style={[styles.dataValue, { color: colors.foreground }]}>{extractedData.diagnosis}</Text></View>}
           {extractedData?.procedureName && <View style={styles.dataRow}><Text style={[styles.dataLabel, { color: colors.muted }]}>Procedimiento:</Text><Text style={[styles.dataValue, { color: colors.foreground }]}>{extractedData.procedureName}</Text></View>}
           {extractedData?.clinic && <View style={styles.dataRow}><Text style={[styles.dataLabel, { color: colors.muted }]}>Clínica:</Text><Text style={[styles.dataValue, { color: colors.foreground }]}>{extractedData.clinic}</Text></View>}
+          {extractedData?.provision && <View style={styles.dataRow}><Text style={[styles.dataLabel, { color: colors.muted }]}>Previsión:</Text><Text style={[styles.dataValue, { color: colors.foreground }]}>{extractedData.provision}</Text></View>}
+          {extractedData?.schedule && <View style={styles.dataRow}><Text style={[styles.dataLabel, { color: colors.muted }]}>Horario:</Text><Text style={[styles.dataValue, { color: colors.foreground }]}>{extractedData.schedule}</Text></View>}
         </View>
+        {ocrTextPreview ? (
+          <View style={[styles.dataContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Text style={[styles.dataTitle, { color: colors.primary }]}>Texto OCR</Text>
+            <Text style={[styles.ocrPreviewText, { color: colors.foreground }]} numberOfLines={12}>
+              {ocrTextPreview}
+            </Text>
+          </View>
+        ) : null}
         <TouchableOpacity onPress={handleConfirmAndNavigate} style={[styles.button, { backgroundColor: colors.primary }]}>
           <IconSymbol name="checkmark.circle.fill" size={18} color="white"/>
           <Text style={styles.buttonText}>Continuar con formulario</Text>
@@ -319,4 +334,5 @@ const styles = StyleSheet.create({
   dataRow:{flexDirection:"row",justifyContent:"space-between",alignItems:"center",paddingVertical:8},
   dataLabel:{fontSize:12,fontWeight:"500"},
   dataValue:{fontSize:12,fontWeight:"600",flex:1,textAlign:"right"},
+  ocrPreviewText:{fontSize:12,lineHeight:18},
 });

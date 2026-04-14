@@ -14,10 +14,8 @@ import {
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
-import { useAuth } from "@/hooks/use-auth";
 import {
   LocalProcedure,
-  MONTHS_ES,
   PROCEDURE_TYPE_LABELS,
   SCHEDULE_TYPE_LABELS,
   useProcedures,
@@ -89,8 +87,7 @@ function StatCard({ label, value, color, icon }: { label: string; value: number;
 export default function HomeScreen() {
   const router = useRouter();
   const colors = useColors();
-  const { isAuthenticated, user } = useAuth();
-  const { procedures, isLoading, refreshFromServer } = useProcedures();
+  const { procedures, isLoading } = useProcedures();
 
   const now = new Date();
   const currentYear = now.getFullYear();

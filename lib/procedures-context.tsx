@@ -1,7 +1,10 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
-import { trpc } from "./trpc";
-import { useAuth } from "@/hooks/use-auth";
+import {
+  deleteProcedureById,
+  initializeProceduresDb,
+  listProcedures,
+  upsertProcedure,
+} from "@/lib/procedures-db";
 
 export type ProcedureType = "cirugia" | "procedimiento" | "interconsulta";
 export type ScheduleType = "habil" | "inhabil";
@@ -9,7 +12,6 @@ export type ScheduleType = "habil" | "inhabil";
 
 export interface LocalProcedure {
   localId: string;
-  serverId?: number;
   synced: boolean;
   patientName: string;
   patientRut: string;
@@ -46,8 +48,6 @@ export const MONTHS_ES = [
   "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
 ];
 
-const STORAGE_KEY = "traumalog_procedures";
-
 interface ProceduresContextType {
   procedures: LocalProcedure[];
   isLoading: boolean;
@@ -70,84 +70,22 @@ function generateId(): string {
 export function ProceduresProvider({ children }: { children: React.ReactNode }) {
   const [procedures, setProcedures] = useState<LocalProcedure[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const { isAuthenticated } = useAuth();
 
-  const createMutation = trpc.procedures.create.useMutation();
-  const updateMutation = trpc.procedures.update.useMutation();
-  const deleteMutation = trpc.procedures.delete.useMutation();
-  const listQuery = trpc.procedures.list.useQuery(undefined, {
-    enabled: isAuthenticated,
-    retry: false,
-  });
-
-  // Load from local storage on mount
-  useEffect(() => {
-    loadFromStorage();
-  }, []);
-
-  // Sync from server when authenticated
-  useEffect(() => {
-    if (isAuthenticated && listQuery.data) {
-      mergeServerData(listQuery.data);
-    }
-  }, [isAuthenticated, listQuery.data]);
-
-  async function loadFromStorage() {
+  const loadFromDatabase = useCallback(async () => {
     try {
-      const stored = await AsyncStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        setProcedures(JSON.parse(stored));
-      }
+      await initializeProceduresDb();
+      const stored = await listProcedures();
+      setProcedures(stored);
     } catch (e) {
-      console.error("Failed to load procedures from storage:", e);
+      console.error("Failed to load procedures from SQLite:", e);
     } finally {
       setIsLoading(false);
     }
-  }
+  }, []);
 
-  async function saveToStorage(data: LocalProcedure[]) {
-    try {
-      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-    } catch (e) {
-      console.error("Failed to save procedures to storage:", e);
-    }
-  }
-
-  function mergeServerData(serverData: any[]) {
-    setProcedures((prev) => {
-      const serverMapped: LocalProcedure[] = serverData.map((sp) => ({
-        localId: `server_${sp.id}`,
-        serverId: sp.id,
-        synced: true,
-        patientName: sp.patientName,
-        patientRut: sp.patientRut,
-        date: sp.date instanceof Date ? sp.date.toISOString() : sp.date,
-        prestacionNumber: sp.prestacionNumber,
-        diagnosis: sp.diagnosis,
-        procedureName: sp.procedureName,
-        procedureCode: sp.procedureCode,
-        type: sp.type as ProcedureType,
-        schedule: sp.schedule as ScheduleType,
-        clinic: sp.clinic,
-        photoUrl: sp.photoUrl,
-        notes: sp.notes,
-        invoiceIssued: sp.invoiceIssued === 1 || sp.invoiceIssued === true,
-        isPaid: sp.isPaid === 1 || sp.isPaid === true,
-        createdAt: sp.createdAt instanceof Date ? sp.createdAt.toISOString() : sp.createdAt,
-        updatedAt: sp.updatedAt instanceof Date ? sp.updatedAt.toISOString() : sp.updatedAt,
-      }));
-
-      // Keep local unsynced items + merge server data
-      const localOnly = prev.filter((p) => !p.synced && !p.serverId);
-      const merged = [...serverMapped, ...localOnly];
-
-      // Sort by date descending
-      merged.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-
-      saveToStorage(merged);
-      return merged;
-    });
-  }
+  useEffect(() => {
+    loadFromDatabase();
+  }, [loadFromDatabase]);
 
   const addProcedure = useCallback(
     async (data: Omit<LocalProcedure, "localId" | "synced" | "createdAt" | "updatedAt">): Promise<string> => {
@@ -156,7 +94,7 @@ export function ProceduresProvider({ children }: { children: React.ReactNode }) 
       const newProc: LocalProcedure = {
         ...data,
         localId,
-        synced: false,
+        synced: true,
         createdAt: now,
         updatedAt: now,
       };
@@ -165,91 +103,34 @@ export function ProceduresProvider({ children }: { children: React.ReactNode }) 
         (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
       );
       setProcedures(updated);
-      await saveToStorage(updated);
-
-      // Try to sync with server
-      if (isAuthenticated) {
-        try {
-          const serverId = await createMutation.mutateAsync({
-            patientName: data.patientName,
-            patientRut: data.patientRut,
-            date: data.date,
-            prestacionNumber: data.prestacionNumber,
-            diagnosis: data.diagnosis,
-            procedureName: data.procedureName,
-            procedureCode: data.procedureCode,
-            type: data.type,
-            schedule: data.schedule,
-            clinic: data.clinic,
-            photoUrl: data.photoUrl,
-            notes: data.notes,
-            invoiceIssued: data.invoiceIssued,
-            isPaid: data.isPaid,
-          });
-
-          const synced = updated.map((p) =>
-            p.localId === localId
-              ? { ...p, serverId: serverId as number, synced: true, localId: `server_${serverId}` }
-              : p
-          );
-          setProcedures(synced);
-          await saveToStorage(synced);
-        } catch (e) {
-          console.warn("Failed to sync new procedure:", e);
-        }
-      }
+      await upsertProcedure(newProc);
 
       return localId;
     },
-    [procedures, isAuthenticated, createMutation]
+    [procedures]
   );
 
   const updateProcedure = useCallback(
     async (localId: string, data: Partial<LocalProcedure>): Promise<void> => {
       const updated = procedures.map((p) =>
-        p.localId === localId
-          ? { ...p, ...data, synced: false, updatedAt: new Date().toISOString() }
-          : p
+        p.localId === localId ? { ...p, ...data, synced: true, updatedAt: new Date().toISOString() } : p
       );
       setProcedures(updated);
-      await saveToStorage(updated);
-
-      const proc = updated.find((p) => p.localId === localId);
-      if (isAuthenticated && proc?.serverId) {
-        try {
-          await updateMutation.mutateAsync({
-            id: proc.serverId,
-            ...data,
-          });
-          const synced = updated.map((p) =>
-            p.localId === localId ? { ...p, synced: true } : p
-          );
-          setProcedures(synced);
-          await saveToStorage(synced);
-        } catch (e) {
-          console.warn("Failed to sync updated procedure:", e);
-        }
+      const procedure = updated.find((p) => p.localId === localId);
+      if (procedure) {
+        await upsertProcedure(procedure);
       }
     },
-    [procedures, isAuthenticated, updateMutation]
+    [procedures]
   );
 
   const deleteProcedure = useCallback(
     async (localId: string): Promise<void> => {
-      const proc = procedures.find((p) => p.localId === localId);
       const updated = procedures.filter((p) => p.localId !== localId);
       setProcedures(updated);
-      await saveToStorage(updated);
-
-      if (isAuthenticated && proc?.serverId) {
-        try {
-          await deleteMutation.mutateAsync({ id: proc.serverId });
-        } catch (e) {
-          console.warn("Failed to sync delete:", e);
-        }
-      }
+      await deleteProcedureById(localId);
     },
-    [procedures, isAuthenticated, deleteMutation]
+    [procedures]
   );
 
   const getProceduresByMonth = useCallback(
@@ -284,14 +165,12 @@ export function ProceduresProvider({ children }: { children: React.ReactNode }) 
   }, [procedures]);
 
   const syncWithServer = useCallback(async () => {
-    if (!isAuthenticated) return;
-    await listQuery.refetch();
-  }, [isAuthenticated, listQuery]);
+    await loadFromDatabase();
+  }, [loadFromDatabase]);
 
   const refreshFromServer = useCallback(async () => {
-    if (!isAuthenticated) return;
-    await listQuery.refetch();
-  }, [isAuthenticated, listQuery]);
+    await loadFromDatabase();
+  }, [loadFromDatabase]);
 
   return (
     <ProceduresContext.Provider

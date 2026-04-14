@@ -138,6 +138,7 @@ export default function ProcedureDetailScreen() {
           <DetailRow label="Procedimiento" value={procedure.procedureName} icon="bandage.fill" />
           <DetailRow label="Código" value={procedure.procedureCode} icon="tag.fill" />
           <DetailRow label="Clínica" value={procedure.clinic} icon="building.2.fill" />
+          <DetailRow label="Previsión" value={procedure.provision} icon="cross.case.fill" />
         </View>
 
         {/* Notes */}
