@@ -98,7 +98,6 @@ const config: ExpoConfig = {
   plugins: [
     "expo-router",
     "expo-asset",
-    "expo-sqlite",
     [
       "expo-camera",
       {

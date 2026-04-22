@@ -69,12 +69,10 @@ export default function CaptureScreen() {
         const originalSize = base64.length;
         const compressedSize = result.base64.length;
         setCompressionStats({ original: originalSize, compressed: compressedSize });
-        console.log(`[OCR Compression] ${Math.round(originalSize/1024)}KB → ${Math.round(compressedSize/1024)}KB`);
         return { base64: result.base64, uri: result.uri ?? uri };
       }
       return { base64, uri };
     } catch (e) {
-      console.warn("[OCR Compression] Failed:", e);
       return { base64, uri };
     }
   };

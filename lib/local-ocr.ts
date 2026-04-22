@@ -44,19 +44,19 @@ export async function recognizeTextFromImage(imageUri: string | null): Promise<R
 
   try {
     const textRecognitionModule = require("expo-text-recognition");
-    const recognize =
-      textRecognitionModule?.recognize ??
-      textRecognitionModule?.default?.recognize;
+    const getTextFromFrame =
+      textRecognitionModule?.getTextFromFrame ??
+      textRecognitionModule?.default?.getTextFromFrame;
 
-    if (typeof recognize !== "function") {
+    if (typeof getTextFromFrame !== "function") {
       return {
         text: "",
         engine: "fallback",
-        warning: "La librería de OCR nativo no expone recognize().",
+        warning: "La librería de OCR nativo no expone getTextFromFrame().",
       };
     }
 
-    const rawResult = await recognize(imageUri);
+    const rawResult = await getTextFromFrame(imageUri, false);
     const text = normalizeRecognitionPayload(rawResult);
 
     if (!text) {
