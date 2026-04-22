@@ -87,20 +87,19 @@ const config: ExpoConfig = {
   plugins: [
     "expo-router",
     "expo-asset",
-    "expo-sqlite",
     [
       "expo-camera",
       {
-        cameraPermission: "Permitir que TraumaLog acceda a la cámara para fotografiar protocolos operatorios.",
-        microphonePermission: "Permitir que TraumaLog acceda al micrófono.",
+        cameraPermission: "Permitir que ArchivaMED acceda a la cámara para fotografiar protocolos operatorios.",
+        microphonePermission: "Permitir que ArchivaMED acceda al micrófono.",
         recordAudioAndroid: false,
       },
     ],
     [
       "expo-image-picker",
       {
-        photosPermission: "Permitir que TraumaLog acceda a tus fotos para importar protocolos operatorios.",
-        cameraPermission: "Permitir que TraumaLog acceda a la cámara para fotografiar protocolos operatorios.",
+        photosPermission: "Permitir que ArchivaMED acceda a tus fotos para importar protocolos operatorios.",
+        cameraPermission: "Permitir que ArchivaMED acceda a la cámara para fotografiar protocolos operatorios.",
       },
     ],
     [
