@@ -102,7 +102,7 @@ const config: ExpoConfig = {
       "expo-camera",
       {
         cameraPermission: "Permitir que ArchivaMED acceda a la cámara para fotografiar protocolos operatorios.",
-        microphonePermission: "Permitir que ArchivaMED acceda al micrófono.",
+        microphonePermission: false,
         recordAudioAndroid: false,
       },
     ],
@@ -111,6 +111,7 @@ const config: ExpoConfig = {
       {
         photosPermission: "Permitir que ArchivaMED acceda a tus fotos para importar protocolos operatorios.",
         cameraPermission: "Permitir que ArchivaMED acceda a la cámara para fotografiar protocolos operatorios.",
+        microphonePermission: false,
       },
     ],
     [
@@ -129,7 +130,7 @@ const config: ExpoConfig = {
       "expo-build-properties",
       {
         ios: {
-          deploymentTarget: "14.0",
+          deploymentTarget: "15.1",
         },
         android: {
           buildArchs: ["armeabi-v7a", "arm64-v8a"],

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { normalizeProvision, getProvisionLabel } from "../server/_core/provision-mapper";
+import { normalizeProvision, getProvisionLabel } from "../lib/provision-mapper";
 
 describe("normalizeProvision", () => {
   describe("FONASA variations", () => {

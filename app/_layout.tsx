@@ -68,7 +68,6 @@ export default function RootLayout() {
       <ProceduresProvider>
         <Stack screenOptions={{ headerShown: false }}>
           <Stack.Screen name="(tabs)" />
-          <Stack.Screen name="oauth/callback" />
           <Stack.Screen name="procedure/[id]" />
           <Stack.Screen name="procedure/new" />
           <Stack.Screen name="procedure/edit/[id]" />

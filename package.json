@@ -15,12 +15,13 @@
     "qr": "node scripts/generate_qr.mjs"
   },
   "dependencies": {
+    "@expo/metro-runtime": "~6.1.2",
     "@expo/vector-icons": "^15.0.3",
     "@react-native-async-storage/async-storage": "^2.2.0",
     "@react-native-ml-kit/text-recognition": "^2.0.0",
     "@react-navigation/bottom-tabs": "^7.4.0",
     "@react-navigation/elements": "^2.9.2",
-    "@react-navigation/native": "^7.2.2",
+    "@react-navigation/native": "^7.1.8",
     "clsx": "^2.1.1",
     "dotenv": "^16.6.1",
     "expo": "~54.0.29",
@@ -42,8 +43,7 @@
     "expo-media-library": "~18.2.1",
     "expo-notifications": "~0.32.15",
     "expo-print": "~15.0.8",
-    "expo-router": "^55.0.12",
-    "expo-secure-store": "~15.0.8",
+    "expo-router": "~6.0.23",
     "expo-sharing": "~14.0.8",
     "expo-splash-screen": "~31.0.12",
     "expo-sqlite": "~16.0.10",
@@ -62,7 +62,6 @@
     "react-native-svg": "15.12.1",
     "react-native-web": "~0.21.2",
     "tailwind-merge": "^2.6.0",
-    "tesseract.js": "^7.0.0",
     "xlsx": "0.18.5",
     "zod": "^4.2.1"
   },
