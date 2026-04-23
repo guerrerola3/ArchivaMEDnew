@@ -41,6 +41,7 @@ export default function CaptureScreen() {
   const router = useRouter();
   const colors = useColors();
   const [permission, requestPermission] = useCameraPermissions();
+  const [mediaPermission, requestMediaPermission] = ImagePicker.useMediaLibraryPermissions();
   const cameraRef = useRef<CameraView>(null);
 
   const [step, setStep] = useState<CaptureStep>("camera");
@@ -96,6 +97,14 @@ export default function CaptureScreen() {
   // ─── Pick from gallery ───────────────────────────────────────
   const handlePickFromGallery = async () => {
     try {
+      if (!mediaPermission?.granted) {
+        const nextPermission = await requestMediaPermission();
+        if (!nextPermission.granted) {
+          Alert.alert("Permiso requerido", "Se necesita acceso a la galería para importar una imagen.");
+          return;
+        }
+      }
+
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         quality: 0.8,

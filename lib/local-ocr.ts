@@ -2,35 +2,20 @@ import { Platform } from "react-native";
 
 type RecognitionResult = {
   text: string;
-  engine: "expo-text-recognition" | "fallback";
+  engine: "@react-native-ml-kit/text-recognition" | "fallback";
   warning?: string;
 };
 
-function collectTextFragments(value: unknown, output: string[]) {
-  if (typeof value === "string") {
-    const trimmed = value.trim();
-    if (trimmed.length > 0) output.push(trimmed);
-    return;
-  }
-
-  if (Array.isArray(value)) {
-    value.forEach((entry) => collectTextFragments(entry, output));
-    return;
-  }
-
-  if (!value || typeof value !== "object") return;
-
-  for (const [key, nested] of Object.entries(value)) {
-    if (key === "value" || key === "text" || key === "result" || key === "lines" || key === "blocks") {
-      collectTextFragments(nested, output);
-    }
-  }
-}
-
-function normalizeRecognitionPayload(payload: unknown): string {
-  const fragments: string[] = [];
-  collectTextFragments(payload, fragments);
-  return Array.from(new Set(fragments)).join("\n");
+function normalizeOcrText(text: string): string {
+  return text
+    .replace(/\r\n/g, "\n")
+    .replace(/[ \t]+/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .join("\n")
+    .trim();
 }
 
 export async function recognizeTextFromImage(imageUri: string | null): Promise<RecognitionResult> {
@@ -43,21 +28,23 @@ export async function recognizeTextFromImage(imageUri: string | null): Promise<R
   }
 
   try {
-    const textRecognitionModule = require("expo-text-recognition");
-    const getTextFromFrame =
-      textRecognitionModule?.getTextFromFrame ??
-      textRecognitionModule?.default?.getTextFromFrame;
+    const textRecognitionModule = require("@react-native-ml-kit/text-recognition");
+    const recognize =
+      textRecognitionModule?.default?.recognize ??
+      textRecognitionModule?.recognize;
 
-    if (typeof getTextFromFrame !== "function") {
+    if (typeof recognize !== "function") {
       return {
         text: "",
         engine: "fallback",
-        warning: "La librería de OCR nativo no expone getTextFromFrame().",
+        warning: "La librería de OCR nativo no expone recognize().",
       };
     }
 
-    const rawResult = await getTextFromFrame(imageUri, false);
-    const text = normalizeRecognitionPayload(rawResult);
+    const rawResult = await recognize(imageUri);
+    const text = normalizeOcrText(
+      typeof rawResult?.text === "string" ? rawResult.text : "",
+    );
 
     if (!text) {
       return {
@@ -69,14 +56,14 @@ export async function recognizeTextFromImage(imageUri: string | null): Promise<R
 
     return {
       text,
-      engine: "expo-text-recognition",
+      engine: "@react-native-ml-kit/text-recognition",
     };
-  } catch (error) {
+  } catch {
     return {
       text: "",
       engine: "fallback",
       warning:
-        "OCR nativo no está instalado o falló en este dispositivo. Se usará extracción local básica.",
+        "OCR nativo no está disponible en esta build. Genera una development build de iOS y vuelve a intentar.",
     };
   }
 }
